@@ -442,3 +442,15 @@ Fix (`app/src/v06-neuro.js`):
 - Routing test: "My left arm feels numb and tingly" now expects level 4 (was 3). Result 40/40.
 
 Pitch angle: in the real event, heart rate, rhythm, blood pressure and SpO2 at the time were never released and may not have been continuously recorded. With the smart shirt worn, our app would have captured them automatically at the moment of the event, given the crew a clear emergency checklist within seconds, and handed the Medical Officer and flight surgeon a timeline. It still would not diagnose: telling a TIA from a heart rhythm problem or another cause needs imaging and specialists, which is why the case goes to humans.
+
+### v0.6.3: Medical kit recommendations (15 Nov 2026)
+
+Team request: should the Doctor recommend specific medicine, based on nine NASA links (Crew Systems, Medical Operations and Clinical Care, NASA-STD-3001 Vol 1 and 2, OCHMO-TB-044 Medical Operations, pre/post-flight and in-flight medical care, standards pages). Finding after reading all of them: NASA names no specific products, only categories. The Orion medical kit lists "anti-inflammatory, antibiotics, space motion sickness, sleep, and allergic-reaction medications". It addresses 128 conditions with 139 resources, and each crew member has a personal kit chosen with the flight surgeon. The Crew Medical Officer works from the Medical Checklist (JSC 48522), and medical authority stays with the Crew Surgeon. Low Earth orbit shows no change in medication stability, dosing or effect. Space motion sickness lasts about 3 days on average.
+
+Built (`v06-meds.js`):
+- For kit-medicine questions (level 2), the Doctor names the NASA kit category plus common over-the-counter examples: ibuprofen or paracetamol; melatonin; meclizine; loratadine or cetirizine; a decongestant spray or pseudoephedrine. Examples are labelled as examples and the dose is never given; the exact item and dose come from the Medical Checklist, and the Medical Officer confirms.
+- Safety checks from the astronaut's own data: allergies from the entry survey; medicines already taken (warns against a second dose of the same type); dehydration (prefer paracetamol over an anti-inflammatory); stomach symptoms; CO2 as the possible cause of a headache or poor sleep; spacewalk or critical operations (no sedating medicine); raised blood pressure (decongestant tablets); drowsiness from anti-nausea medicine; allergic-reaction red flags.
+- Antibiotics and prescription medicines are never suggested; they go to the Medical Officer (level 3).
+- When the Medical Officer approves a kit suggestion, the medicine is logged as taken.
+- A new library, "NASA medical kit and medical operations", with 4 excerpts. The Claude prompt gets the same kit rules.
+- Tested: routing 40/40, zero errors.

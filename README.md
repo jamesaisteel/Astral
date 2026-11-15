@@ -5,7 +5,7 @@ NASA Space Apps Challenge 2026 entry. In the prototype's interface ASTRAL appear
 
 **Live demo:** https://jamesaisteel.github.io/Astral/ (no install, no login, works offline once loaded)
 
-> Research prototype with simulated data. Thresholds are illustrative and still need review by medical experts; ASTRAL is not yet a certified medical device.
+> Prototype with simulated data. Thresholds are illustrative, not clinical or NASA limits, and nothing here is medical advice.
 
 ## What it is
 
@@ -20,7 +20,7 @@ The app has two workspaces at the top right: **Crew app** (the product) and **Te
 3. **A sick teammate (our real reference case: a team member had the flu all hackathon).** Test bench → Scenarios → *Respiratory infection*. Back in the Crew app: Today shows the fever finding; **Workout planner** cancels lifting (rule R1) and offers an easy cycle; ask the **Doctor** "Do I have an infection?" and watch it hand the case to the Medical Officer instead of guessing.
 4. **The crew as one unit.** Test bench → *Crew: infection spreading* or *Crew: food-borne illness*. In the Crew app, set "Viewing as" to **Medical officer** → **Cross-crew analysis** finds the first case or the shared meal; **Medical queue** shows the cases the Doctor escalated.
 5. **A real event, January 2026.** Test bench → *Sudden speech loss (Crew-11 type)*. ASTRAL treats it as a stroke warning sign: emergency checklist, Medical Officer alerted, spacewalk blocked, vitals at the time attached.
-6. **Doctor.** Ask anything ("How can I sleep better?", "Am I fit for the spacewalk?", "Can I take a painkiller?"). Each answer shows its reliability level and the medical library sources it used. **Medical libraries** shows where its knowledge comes from.
+6. **Doctor.** Ask anything ("How can I sleep better?", "Am I fit for the spacewalk?", "Can I take a painkiller?"). For medicine it names the NASA medical-kit category with common examples, checks allergies, earlier doses, hydration and the activity, and the Medical Officer confirms; antibiotics and prescriptions always go to a human. Each answer shows its reliability level and the medical library sources it used. **Medical libraries** shows where its knowledge comes from.
 7. **Skin check.** Pick a demo picture (or upload a photo) and press Analyse. Uncertain, urgent or contagious results go to the Medical Officer.
 8. **Fungi.** Station-wide monitoring with sample history and risk sensors. Test bench → Station environment → *Condensation behind a panel* raises the risk.
 9. **Manual data entry.** Everything sensors can't measure, by frequency, plus the pre-flight **Entry survey** that gives the Doctor the astronaut's history, unlocks training and sets personal baselines.

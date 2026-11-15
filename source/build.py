@@ -28,7 +28,7 @@ swap('<span class="vtag">v0.5</span>', '<span class="vtag">v0.6</span>')
 # 3. Styles
 swap("</style>\n</head>", "\n" + (SRC / "v06.css").read_text(encoding="utf-8") + "</style>\n</head>")
 # 4. Scripts: v0.6 runs after the app is defined and before it starts
-js = (SRC / "v06-core.js").read_text(encoding="utf-8") + "\n" + (SRC / "v06-ui.js").read_text(encoding="utf-8") + "\n" + (SRC / "v06-intake.js").read_text(encoding="utf-8") + "\n" + (SRC / "v06-neuro.js").read_text(encoding="utf-8")
+js = (SRC / "v06-core.js").read_text(encoding="utf-8") + "\n" + (SRC / "v06-ui.js").read_text(encoding="utf-8") + "\n" + (SRC / "v06-intake.js").read_text(encoding="utf-8") + "\n" + (SRC / "v06-neuro.js").read_text(encoding="utf-8") + "\n" + (SRC / "v06-meds.js").read_text(encoding="utf-8")
 swap("init();\n</script>", '</script>\n<script>\n"use strict";\n' + js + "\ninit();\n</script>")
 
 # 5. "Health assistant" is called "Doctor" everywhere the user sees it (code names stay)
