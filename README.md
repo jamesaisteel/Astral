@@ -5,7 +5,7 @@ NASA Space Apps Challenge 2026 entry. In the prototype's interface ASTRAL appear
 
 **Live demo:** https://jamesaisteel.github.io/Astral/ (no install, no login, works offline once loaded)
 
-> Prototype with simulated data. Thresholds are illustrative, not clinical or NASA limits, and nothing here is medical advice.
+> Research prototype with simulated data. Thresholds are illustrative and still need review by medical experts; ASTRAL is not yet a certified medical device.
 
 ## What it is
 
