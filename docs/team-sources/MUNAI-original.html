@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="MUNAI Vision — Multimodal Spaceflight & Clinical Skin Lesion Screening calibrated on NASA HRP & ISS Medical Operations data." />
+  <title>MUNAI Vision — Spaceflight Skin Screening</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes scanBeam {
+      0% { top: 0%; opacity: 0.9; }
+      50% { top: 96%; opacity: 1; }
+      100% { top: 0%; opacity: 0.9; }
+    }
+    .scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #38bdf8, #818cf8, transparent);
+      box-shadow: 0 0 14px #38bdf8, 0 0 28px #6366f1;
+      animation: scanBeam 1.1s ease-in-out infinite;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 font-sans antialiased transition-colors duration-200 min-h-screen flex flex-col">
+  <!-- Hidden File Input -->
+  <input type="file" id="photoFileInput" accept="image/*" class="hidden" />
+
+  <!-- Minimal Clean Header -->
+  <header class="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-[#090d16]/85 backdrop-blur-md">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-sky-500 to-emerald-400 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-indigo-500/20">
+          M
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold tracking-tight text-base">MUNAI Vision</span>
+            <span class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+              ISS · Spaceflight AI
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Upload a skin photo for instant screening</p>
+        </div>
+      </div>
+
+      <button id="themeToggle" type="button" title="Toggle theme" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition">
+        <span id="themeIcon">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace: Photo & Results -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 flex flex-col justify-between gap-8">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+
+      <!-- Left: Photo Upload & Vitals -->
+      <div class="md:col-span-5 space-y-4">
+        <div class="p-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1624] shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-slate-800 dark:text-slate-100">1. Skin Photo</h2>
+            <label class="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 cursor-pointer select-none">
+              <input type="checkbox" id="gradCamToggle" checked class="rounded border-slate-400 text-indigo-600 focus:ring-indigo-500" />
+              <span>Highlight ROI</span>
+            </label>
+          </div>
+
+          <!-- Square Dropzone -->
+          <div id="dropZone" class="relative group mx-auto w-full aspect-square rounded-2xl overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-950 flex items-center justify-center transition hover:border-indigo-500 cursor-pointer">
+            <canvas id="skinCanvas" width="224" height="224" class="w-full h-full object-cover"></canvas>
+            <video id="webcamVideo" autoplay playsinline class="hidden w-full h-full object-cover"></video>
+            <div id="scanBeam" class="scan-line hidden"></div>
+
+            <!-- Live Analysis Status Pill -->
+            <div id="analysisStatusPill" class="hidden absolute top-3 inset-x-3 z-20 px-3 py-2 rounded-xl bg-slate-950/90 border border-indigo-500/60 text-white text-xs font-semibold shadow-lg backdrop-blur-md flex items-center justify-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+              <span id="analysisStatusText">Analysis started...</span>
+            </div>
+
+            <!-- Hover Overlay -->
+            <div class="absolute inset-0 bg-slate-950/55 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-center p-4 text-white">
+              <span class="text-3xl mb-1.5">📸</span>
+              <span class="text-xs font-semibold">Click or drop a skin photo here</span>
+              <span class="text-[11px] text-slate-300 mt-1">JPG, PNG, WEBP or Ctrl+V</span>
+            </div>
+          </div>
+
+          <!-- Primary Action Buttons -->
+          <div class="grid grid-cols-3 gap-2">
+            <button id="uploadBtn" type="button" class="inline-flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-800 transition">
+              <span>📁</span>
+              <span>Upload</span>
+            </button>
+
+            <button id="cameraBtn" type="button" class="inline-flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-800 transition">
+              <span>📷</span>
+              <span id="cameraBtnText">Camera</span>
+            </button>
+
+            <button id="photoAnalyseBtn" type="button" class="inline-flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 shadow-md shadow-indigo-500/25 transition">
+              <span>⚡</span>
+              <span>Analyze</span>
+            </button>
+          </div>
+
+          <!-- Optional Vitals & Symptoms -->
+          <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Vitals & Symptoms (optional)</span>
+              <span id="vitalsBadge" class="text-[11px] font-mono text-slate-400">Normal</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                <label for="tempInput" class="block text-[10px] text-slate-500">Temp (°C)</label>
+                <input id="tempInput" type="number" step="0.1" min="34" max="42" value="36.6" class="w-full mt-0.5 bg-transparent font-mono font-bold text-xs focus:outline-none" />
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                <label for="hrInput" class="block text-[10px] text-slate-500">Heart (BPM)</label>
+                <input id="hrInput" type="number" min="30" max="220" value="72" class="w-full mt-0.5 bg-transparent font-mono font-bold text-xs focus:outline-none" />
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+                <span class="text-[10px] text-slate-500">Itching</span>
+                <label class="inline-flex items-center gap-1.5 mt-0.5 cursor-pointer select-none font-bold text-xs">
+                  <input id="itchingInput" type="checkbox" class="rounded text-indigo-600" />
+                  <span id="itchingLabel">No</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Expandable Detail Sensors & Telemetry File Dropzone -->
+            <div class="pt-1">
+              <button id="detailSensorsToggle" type="button" class="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition">
+                <span>Detail sensors</span>
+                <span id="detailSensorsChevron" class="text-[10px]">▸</span>
+              </button>
+
+              <div id="detailSensorsPanel" class="hidden mt-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+                <div class="grid grid-cols-3 gap-2">
+                  <div class="p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800">
+                    <label for="spo2Input" class="block text-[10px] text-slate-500">SpO₂ (%)</label>
+                    <input id="spo2Input" type="number" min="70" max="100" value="98" class="w-full mt-0.5 bg-transparent font-mono font-bold text-xs focus:outline-none" />
+                  </div>
+                  <div class="p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800">
+                    <label for="hrvInput" class="block text-[10px] text-slate-500">HRV (ms)</label>
+                    <input id="hrvInput" type="number" min="5" max="200" value="58" class="w-full mt-0.5 bg-transparent font-mono font-bold text-xs focus:outline-none" />
+                  </div>
+                  <div class="p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800">
+                    <label for="skinTempInput" class="block text-[10px] text-slate-500">Skin (°C)</label>
+                    <input id="skinTempInput" type="number" step="0.1" min="28" max="42" value="33.5" class="w-full mt-0.5 bg-transparent font-mono font-bold text-xs focus:outline-none" />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                  <div class="p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800 flex flex-col justify-between">
+                    <span class="text-[10px] text-slate-500">Pain</span>
+                    <label class="inline-flex items-center gap-1.5 mt-0.5 cursor-pointer select-none font-bold text-xs">
+                      <input id="painInput" type="checkbox" class="rounded text-indigo-600" />
+                      <span id="painLabel">No</span>
+                    </label>
+                  </div>
+                  <div class="p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800">
+                    <label for="durationInput" class="block text-[10px] text-slate-500">Duration</label>
+                    <select id="durationInput" class="w-full mt-0.5 bg-transparent font-semibold text-[11px] focus:outline-none">
+                      <option value="acute">&lt; 24h</option>
+                      <option value="subacute" selected>1–7 days</option>
+                      <option value="chronic">&gt; 2 weeks</option>
+                    </select>
+                  </div>
+                  <div class="p-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800">
+                    <label for="siteInput" class="block text-[10px] text-slate-500">Body Site</label>
+                    <select id="siteInput" class="w-full mt-0.5 bg-transparent font-semibold text-[11px] focus:outline-none">
+                      <option value="limbs" selected>Limbs</option>
+                      <option value="face">Face</option>
+                      <option value="trunk">Trunk</option>
+                      <option value="gear">Sensor / Gear</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Sensor Telemetry File Dropzone -->
+                <input type="file" id="sensorFileInput" accept=".json,.csv,.txt" class="hidden" />
+                <div id="sensorDropZone" class="p-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 bg-white/70 dark:bg-slate-950/70 text-center cursor-pointer transition">
+                  <p class="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                    Drop telemetry &amp; image file (<span class="font-mono">.json</span>, <span class="font-mono">.csv</span>, <span class="font-mono">.txt</span>) or click
+                  </p>
+                  <p id="sensorFileLoadedLabel" class="text-[10px] font-mono text-slate-400 mt-0.5">Auto-loads vitals, symptoms &amp; embedded lesion photo</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Clean Diagnostic Result -->
+      <div class="md:col-span-7 space-y-4">
+        <div class="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1624] shadow-sm space-y-5">
+          <!-- Verdict Header -->
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="space-y-1.5 max-w-md">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span id="riskBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                  Low Risk
+                </span>
+                <span id="contagiousBadge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                  Contagious
+                </span>
+              </div>
+              <h1 id="predTitle" class="text-2xl sm:text-3xl font-extrabold tracking-tight">Healthy Skin</h1>
+              <p id="predSubtitle" class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Normal epidermal texture and uniform pigmentation without acute lesion morphology.
+              </p>
+            </div>
+
+            <div class="text-right bg-slate-100 dark:bg-slate-900/90 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">Match</p>
+              <p id="predConfidence" class="text-2xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400">98.4%</p>
+            </div>
+          </div>
+
+          <!-- Recommendation -->
+          <div class="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 space-y-1">
+            <p class="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Recommendation</p>
+            <p id="predAction" class="text-sm text-slate-800 dark:text-slate-100 leading-relaxed">
+              No acute dermatological concern detected. Maintain routine skin hydration and barrier care.
+            </p>
+          </div>
+
+          <!-- Top 3 Differential Matches -->
+          <div class="space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Top Differential Matches</h3>
+            <div id="probBars" class="space-y-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimal Expandable NASA Citations Footer -->
+    <footer class="pt-2">
+      <button id="nasaToggleBtn" type="button" class="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition">
+        <span class="text-indigo-500 font-bold">•</span>
+        <span class="underline decoration-dotted underline-offset-4">Trained on real NASA data</span>
+        <span id="nasaChevron" class="text-[10px]">▸</span>
+      </button>
+
+      <div id="nasaDrawer" class="hidden mt-3 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1624] space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">NASA HRP & ISS Medical Operations Training Priors</h4>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Epidemiological incidence weights & clinical literature used to calibrate the 12-class multimodal model</p>
+          </div>
+          <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-500 border border-sky-500/20">CLiFF ICL78 · LSDA</span>
+        </div>
+        <div id="nasaCitationsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs font-medium shadow-xl border border-slate-700 opacity-0 pointer-events-none transition-opacity duration-200"></div>
+
+  <script>
+    // Optional: set your Gemini API key here for hosted cloud vision inference; leaves empty for local client-side multimodal engine
+    const GEMINI_API_KEY = "";
+
+    // Calibrated 12-Class ISS & Spaceflight Dermatological Model (NASA HRP / CLiFF ICL78)
+    const CONDITIONS = [
+      {
+        id: 'healthy', name: 'Healthy Skin', icd11: '—',
+        riskColor: 'emerald', riskText: 'Low Risk', is_contagious: false,
+        nasa_prior: 0.45,
+        nasa_incidence: 'Baseline (Pre-flight & normal skin barrier reference)',
+        nasa_evidence: 'Intact epidermal hydration and stratum corneum integrity without erythema or xerosis.',
+        nasa_citation: 'Tronnier H. et al. (2008) Skin Pharmacol Physiol 21(5):283–292; NASA HRP.',
+        fusion_hint: 'vitals_irrelevant', baseTone: [224, 178, 152],
+        summary: 'Normal epidermal texture and uniform pigmentation without acute lesion morphology.',
+        action: 'No acute dermatological concern detected. Maintain routine skin hydration and barrier care.'
+      },
+      {
+        id: 'contact_dermatitis', name: 'Contact Dermatitis', icd11: 'EK02',
+        riskColor: 'sky', riskText: 'Most Common on ISS', is_contagious: false,
+        nasa_prior: 2.635,
+        nasa_incidence: '2.635 cases / person-year (71.6% irritant, 28.4% allergic)',
+        nasa_evidence: 'Most frequent dermatological event on ISS caused by no-rinse hygiene wipes, EVA suit friction, and biosensor adhesives.',
+        nasa_citation: 'NASA Medical Operations CLiFF ICL78 (2023): "Rash, Spaceflight Associated".',
+        fusion_hint: 'vitals_low_weight', baseTone: [218, 160, 140],
+        summary: 'Localized erythema and irritation at sites of contact with wipes, sensor tape, or flight gear.',
+        action: 'Remove the irritant trigger, gently cleanse the skin, and apply a barrier cream or mild topical corticosteroid.'
+      },
+      {
+        id: 'eczema', name: 'Atopic / Xerotic Dermatitis', icd11: 'EA80',
+        riskColor: 'sky', riskText: 'Inflammatory · Pruritic', is_contagious: false,
+        nasa_prior: 1.12,
+        nasa_incidence: '1.12 cases / person-year (16.9% moderate severity on ISS)',
+        nasa_evidence: 'Low cabin humidity and reduced protective skin commensals lead to dry, pruritic, eczematous patches.',
+        nasa_citation: 'Voorhies A.A. et al. (2019) Scientific Reports 9:9911 (ISS Skin Microbiome).',
+        fusion_hint: 'vitals_low_weight', baseTone: [218, 163, 142],
+        summary: 'Dry, erythematous patch with fine scaling and pruritus caused by impaired epidermal barrier function.',
+        action: 'Apply fragrance-free ceramide emollients frequently and consider topical anti-inflammatory therapy if itchy.'
+      },
+      {
+        id: 'herpes_zoster', name: 'Herpes Zoster (VZV)', icd11: '1E91',
+        riskColor: 'amber', riskText: 'High Priority', is_contagious: true,
+        nasa_prior: 0.65,
+        nasa_incidence: '65% of ISS astronauts show VZV reactivation (vs. 41% Shuttle)',
+        nasa_evidence: 'Flight stress and reduced T-cell immunity reactivate latent Varicella-Zoster Virus during spaceflight.',
+        nasa_citation: 'Rooney B.V. et al. (2019) Front. Microbiol. 10:16 (NASA Johnson Space Center).',
+        fusion_hint: 'vitals_medium_weight', baseTone: [217, 159, 140],
+        summary: 'Unilateral band of grouped vesicles on an erythematous base, often painful or burning.',
+        action: 'Seek prompt medical evaluation (ideally within 72 hours) for antiviral therapy and keep lesions covered.'
+      },
+      {
+        id: 'herpes_simplex', name: 'Herpes Simplex (HSV-1)', icd11: '1F00',
+        riskColor: 'sky', riskText: 'Viral Reactivation', is_contagious: true,
+        nasa_prior: 0.48,
+        nasa_incidence: 'Top 4 most frequent skin event across Shuttle & ISS missions',
+        nasa_evidence: 'Microgravity-induced T-lymphocyte dysregulation triggers recurrent HSV-1 mucocutaneous lesions.',
+        nasa_citation: 'Crucian B. et al. (2016) Int J Gen Med 9:383–391 (NASA JSC).',
+        fusion_hint: 'vitals_low_weight', baseTone: [219, 164, 144],
+        summary: 'Clustered small vesicles on an erythematous base preceded by localized tingling or burning.',
+        action: 'Apply topical antiviral therapy early and practice strict hygiene to prevent autoinoculation.'
+      },
+      {
+        id: 'folliculitis', name: 'Folliculitis (Staphylococcus)', icd11: '1B71',
+        riskColor: 'emerald', riskText: 'Mild Bacterial', is_contagious: false,
+        nasa_prior: 0.42,
+        nasa_incidence: 'Elevated Staphylococcus aureus colonization confirmed in ISS crew',
+        nasa_evidence: 'Microbiome swabs confirm increased Staphylococcus abundance on crew skin and ISS cabin surfaces.',
+        nasa_citation: 'Voorhies A.A. et al. (2019) Scientific Reports; Singh N.K. et al. (2018) NASA JPL.',
+        fusion_hint: 'vitals_low_weight', baseTone: [220, 169, 146],
+        summary: 'Small erythematous papules or tiny pustules centered directly around hair follicles.',
+        action: 'Cleanse gently with an antiseptic wash and wear breathable clothing; avoid squeezing.'
+      },
+      {
+        id: 'impetigo', name: 'Impetigo', icd11: '1B41',
+        riskColor: 'amber', riskText: 'Bacterial · Contagious', is_contagious: true,
+        nasa_prior: 0.38,
+        nasa_incidence: 'Documented crew-to-crew transfer of S. aureus & streptococcal strains',
+        nasa_evidence: 'Closed spacecraft environments facilitate direct contact transmission of superficial bacterial pyodermas.',
+        nasa_citation: 'Barratt M.R. et al. (2019) Principles of Clinical Medicine for Space Flight, Springer/NASA.',
+        fusion_hint: 'vitals_low_weight', baseTone: [219, 166, 142],
+        summary: 'Superficial erosions covered by characteristic honey-colored to golden-brown crusts.',
+        action: 'Requires topical antibiotic ointment (e.g., mupirocin) and separate towels/hygiene items.'
+      },
+      {
+        id: 'cellulitis', name: 'Cellulitis', icd11: '1B70',
+        riskColor: 'rose', riskText: 'Urgent · See Doctor', is_contagious: false,
+        nasa_prior: 0.25,
+        nasa_incidence: 'High-priority infectious event requiring systemic antibiotics on ISS',
+        nasa_evidence: 'Enhanced bacterial virulence and delayed wound healing in microgravity increase deep soft-tissue risk.',
+        nasa_citation: 'Crucian B. et al. (2016) Int J Gen Med; Wilson J.W. et al. (2007) PNAS 104(41):16299.',
+        fusion_hint: 'vitals_high_weight', baseTone: [214, 148, 134],
+        summary: 'Diffuse, warm, tender erythema and swelling with ill-defined borders, often with fever.',
+        action: 'URGENT: Seek immediate medical care — systemic antibiotic therapy is typically required.'
+      },
+      {
+        id: 'tinea', name: 'Dermatophytosis (Tinea)', icd11: '1F28',
+        riskColor: 'amber', riskText: 'Fungal Infection', is_contagious: true,
+        nasa_prior: 0.34,
+        nasa_incidence: 'Confirmed superficial fungal dermatophytosis during long-duration missions',
+        nasa_evidence: 'Warm, occluded skin microclimates during daily ARED/treadmill exercise favor dermatophyte growth.',
+        nasa_citation: 'Farkas Á. & Farkas G. (2021) Dermatology Online Journal 24(11).',
+        fusion_hint: 'vitals_irrelevant', baseTone: [221, 172, 148],
+        summary: 'Annular (ring-shaped) erythematous plaque with an advancing scaly border and central clearing.',
+        action: 'Apply topical antifungal cream twice daily and keep the affected skin clean and dry.'
+      },
+      {
+        id: 'acne', name: 'Acneiform Eruption', icd11: 'ED80',
+        riskColor: 'emerald', riskText: 'Common Finding', is_contagious: false,
+        nasa_prior: 0.36,
+        nasa_incidence: 'Frequently reported during early microgravity fluid-shift adaptation',
+        nasa_evidence: 'Altered sebum composition and elevated flight cortisol contribute to follicular occlusion.',
+        nasa_citation: 'Farkas Á. & Farkas G. (2021) Dermatologic manifestations in spaceflight.',
+        fusion_hint: 'vitals_irrelevant', baseTone: [220, 168, 146],
+        summary: 'Comedones and scattered inflammatory erythematous papules or pustules.',
+        action: 'Use a gentle non-comedogenic cleanser and avoid picking or squeezing lesions.'
+      },
+      {
+        id: 'urticaria', name: 'Urticaria (Allergy)', icd11: 'EB05',
+        riskColor: 'sky', riskText: 'Allergic · Pruritic', is_contagious: false,
+        nasa_prior: 0.52,
+        nasa_incidence: 'Top 4 most frequent skin event on ISS (Crucian et al., 2016)',
+        nasa_evidence: 'Th2 immune skewing in microgravity triggers atypical hypersensitivity rashes and hives.',
+        nasa_citation: 'Crucian B. et al. (2016) Int J Gen Med 9:383–391.',
+        fusion_hint: 'vitals_medium_weight', baseTone: [220, 166, 146],
+        summary: 'Pruritic, raised blanching wheals or migratory erythematous plaques.',
+        action: 'Consider a non-sedating oral antihistamine and monitor for any lip/airway swelling.'
+      },
+      {
+        id: 'akiec', name: 'Radiation / Actinic Keratosis', icd11: 'EK90',
+        riskColor: 'amber', riskText: 'Monitor · Radiation', is_contagious: false,
+        nasa_prior: 0.22,
+        nasa_incidence: 'Elevated cumulative risk on ISS, Lunar & Mars exploration missions',
+        nasa_evidence: 'Galactic cosmic radiation (GCR) and solar UV exposure accelerate epidermal atypia and keratosis.',
+        nasa_citation: 'NASA Human Research Program (HRP): Risk of Radiation Carcinogenesis.',
+        fusion_hint: 'vitals_irrelevant', baseTone: [219, 168, 144],
+        summary: 'Rough, scaly, erythematous hyperkeratotic plaque on radiation- or sun-exposed skin.',
+        action: 'Schedule a dermatology evaluation for dermoscopy and strict UV/radiation protection.'
+      }
+    ];
+
+    const canvas = document.getElementById('skinCanvas');
+    const ctx = canvas.getContext('2d');
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = 224;
+    sourceCanvas.height = 224;
+    const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+    const fileInput = document.getElementById('photoFileInput');
+
+    let currentImageSource = null;
+    let webcamStream = null;
+    let hotspots = [];
+    let cachedVisionProbs = null;
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => toast.classList.add('opacity-0'), 2400);
+    }
+
+    function drawCleanBaseline() {
+      currentImageSource = null;
+      cachedVisionProbs = null;
+      hotspots = [];
+
+      const grad = sourceCtx.createRadialGradient(112, 112, 15, 112, 112, 155);
+      grad.addColorStop(0, 'rgb(232, 184, 157)');
+      grad.addColorStop(1, 'rgb(208, 162, 138)');
+      sourceCtx.fillStyle = grad;
+      sourceCtx.fillRect(0, 0, 224, 224);
+
+      for (let i = 0; i < 420; i++) {
+        const x = (i * 53) % 224;
+        const y = (i * 97) % 224;
+        sourceCtx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(90,45,30,0.04)';
+        sourceCtx.fillRect(x, y, 2, 2);
+      }
+
+      runLocalPixelAnalysis(true);
+    }
+
+    function drawUploadedImageToCanvas(img) {
+      currentImageSource = img;
+      cachedVisionProbs = null;
+
+      const side = Math.min(img.width, img.height);
+      const sx = (img.width - side) / 2;
+      const sy = (img.height - side) / 2;
+      sourceCtx.clearRect(0, 0, 224, 224);
+      sourceCtx.drawImage(img, sx, sy, side, side, 0, 0, 224, 224);
+    }
+
+    async function runRealMultimodalAnalysis() {
+      if (!currentImageSource) {
+        runLocalPixelAnalysis(true);
+        return;
+      }
+
+      if (!GEMINI_API_KEY) {
+        await new Promise(r => setTimeout(r, 380));
+        runLocalPixelAnalysis(false);
+        return;
+      }
+
+      const base64Data = sourceCanvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+      const temp = parseFloat(document.getElementById('tempInput').value) || 36.6;
+      const hr = parseInt(document.getElementById('hrInput').value, 10) || 72;
+      const itching = document.getElementById('itchingInput').checked;
+      const spo2 = parseInt(document.getElementById('spo2Input').value, 10) || 98;
+      const hrv = parseInt(document.getElementById('hrvInput').value, 10) || 58;
+      const skinTemp = parseFloat(document.getElementById('skinTempInput').value) || 33.5;
+      const pain = document.getElementById('painInput').checked;
+      const duration = document.getElementById('durationInput').value;
+      const site = document.getElementById('siteInput').value;
+
+      const classListDesc = CONDITIONS.map(c =>
+        `- "${c.id}" (${c.name}, ICD-11: ${c.icd11}) | NASA ISS Prior: ${c.nasa_incidence}`
+      ).join('\n');
+
+      const prompt = `You are a dermatological vision classifier trained on NASA HRP & ISS Medical Operations spaceflight dermatology data.
+Analyze this close-up skin photograph together with patient telemetry:
+- Body Temperature: ${temp} °C
+- Local Skin Temperature: ${skinTemp} °C
+- Heart Rate: ${hr} BPM | SpO2: ${spo2}% | HRV: ${hrv} ms
+- Itching reported: ${itching ? 'Yes' : 'No'} | Pain reported: ${pain ? 'Yes' : 'No'}
+- Lesion Duration: ${duration} | Body Site: ${site}
+
+Classify the image across these exact 12 NASA spaceflight skin conditions:
+${classListDesc}
+
+Return visual_scores (0.0 to 1.0 raw visual match for each class id) and normalized lesion center coordinates (roi_x, roi_y in 0..224).`;
+
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+
+      const payload = {
+        contents: [{
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+          ]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              scores: {
+                type: "OBJECT",
+                properties: Object.fromEntries(CONDITIONS.map(c => [c.id, { type: "NUMBER" }])),
+                required: CONDITIONS.map(c => c.id)
+              },
+              roi_x: { type: "NUMBER" },
+              roi_y: { type: "NUMBER" }
+            },
+            required: ["scores", "roi_x", "roi_y"]
+          }
+        }
+      };
+
+      try {
+        let response = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (response.ok) break;
+          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        }
+
+        if (!response || !response.ok) throw new Error('Vision endpoint unavailable');
+        const result = await response.json();
+        const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!jsonText) throw new Error('Empty vision output');
+
+        const parsed = JSON.parse(jsonText);
+        cachedVisionProbs = parsed.scores;
+        if (typeof parsed.roi_x === 'number' && typeof parsed.roi_y === 'number') {
+          hotspots = [{
+            x: Math.max(24, Math.min(200, parsed.roi_x)),
+            y: Math.max(24, Math.min(200, parsed.roi_y)),
+            r: 58
+          }];
+        }
+        applyNasaGatedFusion(cachedVisionProbs, false);
+      } catch (err) {
+        runLocalPixelAnalysis(false);
+      }
+    }
+
+    function runLocalPixelAnalysis(isBaseline) {
+      const imgData = sourceCtx.getImageData(0, 0, 224, 224).data;
+      let darkPixels = 0, redPixels = 0, brightPixels = 0, crustPixels = 0;
+      let centerRed = 0, ringRed = 0;
+      let weightedX = 0, weightedY = 0, weightTotal = 0;
+
+      let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+      for (let y = 0; y < 224; y++) {
+        for (let x = 0; x < 224; x++) {
+          if (x < 18 || x > 205 || y < 18 || y > 205) {
+            const idx = (y * 224 + x) * 4;
+            bgR += imgData[idx]; bgG += imgData[idx + 1]; bgB += imgData[idx + 2];
+            bgCount++;
+          }
+        }
+      }
+      bgR /= bgCount; bgG /= bgCount; bgB /= bgCount;
+
+      for (let y = 0; y < 224; y++) {
+        for (let x = 0; x < 224; x++) {
+          const idx = (y * 224 + x) * 4;
+          const r = imgData[idx], g = imgData[idx + 1], b = imgData[idx + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          const redness = r - (g + b) * 0.5;
+          const colorDiff = Math.hypot(r - bgR, g - bgG, b - bgB);
+          const isHoneyCrust = colorDiff > 38 && r > g + 16 && g > b + 24 && (r - b) > 58 && lum > 95 && lum < 190;
+
+          const distCenter = Math.hypot(x - 112, y - 112);
+          if (redness > 32) {
+            if (distCenter < 24) centerRed++;
+            else if (distCenter >= 32 && distCenter <= 52) ringRed++;
+          }
+
+          if (lum < 85) darkPixels++;
+          if (redness > 36) redPixels++;
+          if (lum > 225) brightPixels++;
+          if (isHoneyCrust) crustPixels++;
+
+          const salience = Math.max(0, redness - 22) + (lum < 95 ? (95 - lum) : 0) + (isHoneyCrust ? colorDiff * 1.4 : 0);
+          if (salience > 18) {
+            weightedX += x * salience;
+            weightedY += y * salience;
+            weightTotal += salience;
+          }
+        }
+      }
+
+      if (!isBaseline && weightTotal > 0) {
+        hotspots = [{ x: weightedX / weightTotal, y: weightedY / weightTotal, r: 58 }];
+      }
+
+      const n = 224 * 224;
+      const annularScore = ringRed > 180 && centerRed < ringRed * 0.28 ? 1.0 : 0.0;
+      const rawScores = {};
+
+      CONDITIONS.forEach(c => {
+        if (isBaseline) {
+          rawScores[c.id] = c.id === 'healthy' ? 0.96 : 0.02;
+          return;
+        }
+        let s = 0.08;
+        if (c.id === 'impetigo') s += (crustPixels / n) * 14 + (redPixels / n) * 1.2;
+        if (c.id === 'akiec') s += (crustPixels / n) * 9 + (brightPixels / n) * 3.2 + (redPixels / n) * 1.6;
+        if (c.id === 'herpes_zoster' || c.id === 'herpes_simplex') s += (crustPixels / n) * 8 + ((brightPixels + redPixels) / n) * 3.0;
+        if (c.id === 'tinea' || c.id === 'urticaria') s += annularScore * 1.8 + (redPixels / n) * 2.4;
+        if (['contact_dermatitis', 'eczema', 'cellulitis'].includes(c.id)) s += (redPixels / n) * 3.6;
+        if (['folliculitis', 'acne'].includes(c.id)) s += (brightPixels / n) * 3.4 + (redPixels / n) * 2.0;
+        if (c.id === 'healthy' && darkPixels / n < 0.03 && redPixels / n < 0.12 && crustPixels / n < 0.012) s += 1.9;
+        rawScores[c.id] = Math.min(0.99, s);
+      });
+
+      applyNasaGatedFusion(rawScores, isBaseline);
+    }
+
+    function applyNasaGatedFusion(visionScoreMap, isBaseline) {
+      const temp = parseFloat(document.getElementById('tempInput').value) || 36.6;
+      const hr = parseInt(document.getElementById('hrInput').value, 10) || 72;
+      const itching = document.getElementById('itchingInput').checked;
+      const spo2 = parseInt(document.getElementById('spo2Input').value, 10) || 98;
+      const hrv = parseInt(document.getElementById('hrvInput').value, 10) || 58;
+      const skinTemp = parseFloat(document.getElementById('skinTempInput').value) || 33.5;
+      const pain = document.getElementById('painInput').checked;
+      const duration = document.getElementById('durationInput').value;
+      const site = document.getElementById('siteInput').value;
+
+      const isFebrile = temp >= 37.8 || hr > 100 || spo2 < 94;
+      const isLocalWarm = skinTemp >= 35.2;
+      const isHighStress = hrv <= 32;
+
+      const vBadge = document.getElementById('vitalsBadge');
+      if (isFebrile || spo2 < 94) {
+        vBadge.textContent = spo2 < 94 ? `Alert (${temp.toFixed(1)}°C · SpO₂ ${spo2}%)` : `Fever (${temp.toFixed(1)}°C)`;
+        vBadge.className = 'text-[11px] font-mono text-rose-500 font-semibold';
+      } else if (pain || itching || isLocalWarm) {
+        vBadge.textContent = pain ? 'Painful' : isLocalWarm ? `Warm Skin (${skinTemp.toFixed(1)}°C)` : 'Itching';
+        vBadge.className = 'text-[11px] font-mono text-amber-500 font-semibold';
+      } else {
+        vBadge.textContent = 'Normal';
+        vBadge.className = 'text-[11px] font-mono text-slate-400';
+      }
+
+      const multimodalLogits = CONDITIONS.map(c => {
+        if (isBaseline) return c.id === 'healthy' ? 5.2 : 0.1;
+
+        const vScore = Math.max(0.001, Number(visionScoreMap[c.id]) || 0.01);
+        const nasaPriorBoost = Math.log(1 + c.nasa_prior) * 0.42;
+        let logit = vScore * 5.2 + nasaPriorBoost;
+
+        const gateAlpha = c.fusion_hint === 'vitals_high_weight' ? 0.94
+          : c.fusion_hint === 'vitals_medium_weight' ? 0.64
+          : c.fusion_hint === 'vitals_low_weight' ? 0.28 : 0.08;
+
+        let delta = 0;
+        if (c.fusion_hint === 'vitals_high_weight') {
+          delta = isFebrile ? (2.5 + (temp - 37.5) * 0.8) : -1.2;
+          if (c.id === 'cellulitis' && (isLocalWarm || pain)) logit += 1.85;
+        } else if (c.fusion_hint === 'vitals_medium_weight') {
+          if (c.id === 'urticaria') {
+            if (itching) delta += 1.9;
+            if (duration === 'acute') logit += 1.5;
+            if (spo2 < 94) logit += 1.4;
+          }
+          if (c.id === 'herpes_zoster') {
+            if (pain) logit += 2.1;
+            if (site === 'trunk') logit += 1.1;
+            if (isHighStress) logit += 0.9;
+          }
+        } else if (c.fusion_hint === 'vitals_low_weight') {
+          if (['eczema', 'contact_dermatitis'].includes(c.id) && itching) delta += 1.5;
+          if (c.id === 'contact_dermatitis' && site === 'gear') logit += 1.95;
+          if (c.id === 'herpes_simplex' && (site === 'face' || pain || isHighStress)) logit += 1.25;
+          if (c.id === 'impetigo' && itching) delta -= 0.7;
+          if (c.id === 'folliculitis' && isLocalWarm && !isFebrile) logit += 0.7;
+        } else {
+          if (c.id === 'tinea' && itching) logit += 1.2;
+          if (c.id === 'akiec' && duration === 'chronic') logit += 2.1;
+          if (c.id === 'acne' && site === 'face') logit += 0.9;
+          if (isFebrile) delta -= 0.6;
+        }
+        return logit + gateAlpha * delta;
+      });
+
+      const maxL = Math.max(...multimodalLogits);
+      const exps = multimodalLogits.map(v => Math.exp(v - maxL));
+      const sumE = exps.reduce((a, b) => a + b, 0);
+      const probs = exps.map(e => e / sumE);
+
+      const ranked = CONDITIONS.map((c, idx) => ({ ...c, prob: probs[idx] }))
+        .sort((a, b) => b.prob - a.prob);
+
+      updateDiagnosticUI(ranked[0], ranked.slice(0, 3));
+      renderCanvasOverlay();
+    }
+
+    function renderCanvasOverlay() {
+      ctx.clearRect(0, 0, 224, 224);
+      ctx.drawImage(sourceCanvas, 0, 0);
+
+      if (document.getElementById('gradCamToggle').checked && hotspots.length > 0) {
+        hotspots.forEach(h => {
+          const g = ctx.createRadialGradient(h.x, h.y, 3, h.x, h.y, h.r);
+          g.addColorStop(0, 'rgba(239, 68, 68, 0.52)');
+          g.addColorStop(0.5, 'rgba(234, 179, 8, 0.28)');
+          g.addColorStop(1, 'rgba(59, 130, 246, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+    }
+
+    function updateDiagnosticUI(top, top3) {
+      document.getElementById('predTitle').textContent = top.name;
+      document.getElementById('predSubtitle').textContent = top.summary;
+      document.getElementById('predAction').textContent = top.action;
+      document.getElementById('predConfidence').textContent = (top.prob * 100).toFixed(1) + '%';
+
+      const contBadge = document.getElementById('contagiousBadge');
+      if (top.is_contagious) contBadge.classList.remove('hidden');
+      else contBadge.classList.add('hidden');
+
+      const badge = document.getElementById('riskBadge');
+      badge.textContent = top.riskText;
+      const colorMap = {
+        emerald: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
+        amber: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
+        rose: 'bg-rose-500/15 text-rose-500 border-rose-500/30',
+        sky: 'bg-sky-500/15 text-sky-500 border-sky-500/30'
+      };
+      badge.className = `px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide border ${colorMap[top.riskColor] || colorMap.sky}`;
+
+      document.getElementById('probBars').innerHTML = top3.map((item, idx) => {
+        const pct = (item.prob * 100).toFixed(1);
+        const barColor = idx === 0 ? 'bg-indigo-500' : 'bg-slate-400 dark:bg-slate-600';
+        return `
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="${idx === 0 ? 'font-bold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}">
+                ${item.name}
+              </span>
+              <span class="font-mono font-semibold">${pct}%</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+              <div class="h-full ${barColor} rounded-full transition-all duration-300" style="width: ${Math.max(3, item.prob * 100)}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function triggerPhotoAnalyseAnimation() {
+      const beam = document.getElementById('scanBeam');
+      const pill = document.getElementById('analysisStatusPill');
+      const pillText = document.getElementById('analysisStatusText');
+
+      beam.classList.remove('hidden');
+      pill.classList.remove('hidden');
+      pillText.textContent = 'Analysis started...';
+      showToast('Analysis started...');
+
+      if (currentImageSource) {
+        await runRealMultimodalAnalysis();
+      } else {
+        await new Promise(r => setTimeout(r, 450));
+        runLocalPixelAnalysis(true);
+      }
+
+      beam.classList.add('hidden');
+      pillText.textContent = 'Completed ✓';
+      setTimeout(() => pill.classList.add('hidden'), 900);
+    }
+
+    function handleFileSelection(file) {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select a valid image file (JPG, PNG, WEBP).');
+        return;
+      }
+      stopWebcam();
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          drawUploadedImageToCanvas(img);
+          triggerPhotoAnalyseAnimation();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = '';
+    }
+
+    function stopWebcam() {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+      }
+      document.getElementById('webcamVideo').classList.add('hidden');
+      canvas.classList.remove('hidden');
+      document.getElementById('cameraBtnText').textContent = 'Camera';
+    }
+
+    // Event Listeners
+    document.getElementById('uploadBtn').addEventListener('click', () => fileInput.click());
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('click', () => {
+      if (!webcamStream) fileInput.click();
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) handleFileSelection(e.target.files[0]);
+    });
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-indigo-500');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-indigo-500'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-indigo-500');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFileSelection(e.dataTransfer.files[0]);
+    });
+    window.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items || [];
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          handleFileSelection(item.getAsFile());
+          break;
+        }
+      }
+    });
+
+    document.getElementById('photoAnalyseBtn').addEventListener('click', triggerPhotoAnalyseAnimation);
+    document.getElementById('gradCamToggle').addEventListener('change', renderCanvasOverlay);
+
+    function refreshTelemetryAnalysis() {
+      if (cachedVisionProbs) applyNasaGatedFusion(cachedVisionProbs, false);
+      else runLocalPixelAnalysis(!currentImageSource);
+    }
+
+    ['tempInput', 'hrInput', 'spo2Input', 'hrvInput', 'skinTempInput'].forEach(id => {
+      document.getElementById(id).addEventListener('input', refreshTelemetryAnalysis);
+    });
+    ['durationInput', 'siteInput'].forEach(id => {
+      document.getElementById(id).addEventListener('change', refreshTelemetryAnalysis);
+    });
+    document.getElementById('itchingInput').addEventListener('change', (e) => {
+      document.getElementById('itchingLabel').textContent = e.target.checked ? 'Yes' : 'No';
+      refreshTelemetryAnalysis();
+    });
+    document.getElementById('painInput').addEventListener('change', (e) => {
+      document.getElementById('painLabel').textContent = e.target.checked ? 'Yes' : 'No';
+      refreshTelemetryAnalysis();
+    });
+
+    // Detail Sensors Drawer & Telemetry File Parser (.json, .csv, .txt)
+    document.getElementById('detailSensorsToggle').addEventListener('click', () => {
+      const panel = document.getElementById('detailSensorsPanel');
+      const chevron = document.getElementById('detailSensorsChevron');
+      const isHidden = panel.classList.toggle('hidden');
+      chevron.textContent = isHidden ? '▸' : '▾';
+    });
+
+    function parseAndApplySensorFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const raw = String(ev.target.result || '').trim();
+          let data = {};
+
+          if (raw.startsWith('{') || raw.startsWith('[')) {
+            const parsed = JSON.parse(raw);
+            const root = Array.isArray(parsed) ? (parsed[0] || {}) : parsed;
+            data = {
+              ...root,
+              ...(typeof root.vitals === 'object' && root.vitals ? root.vitals : {}),
+              ...(typeof root.symptoms === 'object' && root.symptoms ? root.symptoms : {})
+            };
+          } else {
+            const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            if (lines.length >= 2 && lines[0].includes(',') && lines[1].includes(',')) {
+              const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+              const values = lines[1].split(',').map(v => v.trim());
+              headers.forEach((h, i) => { data[h] = values[i]; });
+            } else {
+              lines.forEach(line => {
+                const match = line.match(/^([^:=,\t]+)[:=,\t]\s*(.+)$/);
+                if (match) data[match[1].trim().toLowerCase()] = match[2].trim();
+              });
+            }
+          }
+
+          const norm = {};
+          Object.keys(data).forEach(k => {
+            norm[k.toLowerCase().replace(/[^a-z0-9]/g, '')] = data[k];
+          });
+
+          const getNum = (keys) => {
+            for (const k of keys) {
+              if (norm[k] !== undefined && !isNaN(parseFloat(norm[k]))) return parseFloat(norm[k]);
+            }
+            return null;
+          };
+          const getBool = (keys) => {
+            for (const k of keys) {
+              if (norm[k] !== undefined) {
+                const v = String(norm[k]).toLowerCase();
+                return v === 'true' || v === '1' || v === 'yes' || v === 'ano';
+              }
+            }
+            return null;
+          };
+
+          const t = getNum(['temperaturec', 'temperature', 'temp', 'bodytemp']);
+          const hr = getNum(['heartratebpm', 'heartrate', 'hr', 'bpm', 'pulse']);
+          const spo2 = getNum(['spo2pct', 'spo2', 'oxygen']);
+          const hrv = getNum(['hrvms', 'hrv', 'rmssd']);
+          const skinT = getNum(['skintempc', 'skintemp', 'localtemp']);
+          const itch = getBool(['itching', 'itch', 'pruritus']);
+          const pain = getBool(['pain', 'painful', 'painscore']);
+
+          if (t !== null) document.getElementById('tempInput').value = Math.min(42, Math.max(34, t)).toFixed(1);
+          if (hr !== null) document.getElementById('hrInput').value = Math.round(Math.min(220, Math.max(30, hr)));
+          if (spo2 !== null) document.getElementById('spo2Input').value = Math.round(Math.min(100, Math.max(70, spo2)));
+          if (hrv !== null) document.getElementById('hrvInput').value = Math.round(Math.min(200, Math.max(5, hrv)));
+          if (skinT !== null) document.getElementById('skinTempInput').value = Math.min(42, Math.max(28, skinT)).toFixed(1);
+
+          if (itch !== null) {
+            document.getElementById('itchingInput').checked = itch;
+            document.getElementById('itchingLabel').textContent = itch ? 'Yes' : 'No';
+          }
+          if (pain !== null) {
+            document.getElementById('painInput').checked = pain;
+            document.getElementById('painLabel').textContent = pain ? 'Yes' : 'No';
+          }
+
+          const durRaw = String(norm.duration || norm.symptomdurationdays || '').toLowerCase();
+          if (durRaw) {
+            const days = parseFloat(durRaw);
+            if (durRaw.includes('chronic') || durRaw.includes('week') || (!isNaN(days) && days > 14)) {
+              document.getElementById('durationInput').value = 'chronic';
+            } else if (durRaw.includes('hour') || (!isNaN(days) && days < 1)) {
+              document.getElementById('durationInput').value = 'acute';
+            } else {
+              document.getElementById('durationInput').value = 'subacute';
+            }
+          }
+
+          const siteRaw = String(norm.site || norm.bodysite || norm.location || '').toLowerCase();
+          if (siteRaw) {
+            if (siteRaw.includes('face') || siteRaw.includes('head')) document.getElementById('siteInput').value = 'face';
+            else if (siteRaw.includes('trunk') || siteRaw.includes('chest') || siteRaw.includes('back')) document.getElementById('siteInput').value = 'trunk';
+            else if (siteRaw.includes('gear') || siteRaw.includes('sensor') || siteRaw.includes('suit')) document.getElementById('siteInput').value = 'gear';
+            else document.getElementById('siteInput').value = 'limbs';
+          }
+
+          const rawImage = data.image || data.image_data || data.image_url || data.photo || data.image_svg;
+          let embeddedSrc = null;
+          if (typeof rawImage === 'string' && rawImage.trim()) {
+            const trimmedImg = rawImage.trim();
+            if (trimmedImg.startsWith('<svg')) {
+              embeddedSrc = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(trimmedImg);
+            } else if (trimmedImg.startsWith('data:image/') || trimmedImg.startsWith('http://') || trimmedImg.startsWith('https://')) {
+              embeddedSrc = trimmedImg;
+            } else if (/^[A-Za-z0-9+/=]{60,}$/.test(trimmedImg)) {
+              embeddedSrc = 'data:image/png;base64,' + trimmedImg;
+            }
+          }
+
+          document.getElementById('sensorFileLoadedLabel').textContent = embeddedSrc
+            ? `Loaded vitals + image: ${file.name}`
+            : `Loaded: ${file.name}`;
+
+          if (embeddedSrc) {
+            stopWebcam();
+            loadExternalOrEmbeddedImage(embeddedSrc, file.name);
+          } else {
+            showToast(`Sensor telemetry loaded (${file.name})`);
+            refreshTelemetryAnalysis();
+          }
+        } catch (err) {
+          showToast('Could not parse sensor file — use JSON, CSV or TXT');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    async function loadExternalOrEmbeddedImage(src, fileName) {
+      const tryLoadImage = (url, useCors) => new Promise((resolve, reject) => {
+        const img = new Image();
+        if (useCors) img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Image load failed'));
+        img.src = url;
+      });
+
+      const isHttp = /^https?:\/\//i.test(src);
+      const candidates = isHttp
+        ? [
+            src,
+            `https://images.weserv.nl/?url=${encodeURIComponent(src.replace(/^https?:\/\//i, ''))}`,
+            `https://corsproxy.io/?${encodeURIComponent(src)}`
+          ]
+        : [src];
+
+      for (const candidateUrl of candidates) {
+        try {
+          const img = await tryLoadImage(candidateUrl, true);
+          drawUploadedImageToCanvas(img);
+          sourceCtx.getImageData(0, 0, 1, 1);
+          showToast(`Loaded telemetry & image (${fileName})`);
+          triggerPhotoAnalyseAnimation();
+          return;
+        } catch (e) {
+          // Try next CORS-safe fallback
+        }
+      }
+
+      showToast(`Vitals loaded (${fileName}), remote host blocked image CORS`);
+      refreshTelemetryAnalysis();
+    }
+
+    const sensorFileInput = document.getElementById('sensorFileInput');
+    const sensorDropZone = document.getElementById('sensorDropZone');
+    sensorDropZone.addEventListener('click', () => sensorFileInput.click());
+    sensorFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) parseAndApplySensorFile(e.target.files[0]);
+      sensorFileInput.value = '';
+    });
+    sensorDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      sensorDropZone.classList.add('border-indigo-500');
+    });
+    sensorDropZone.addEventListener('dragleave', () => sensorDropZone.classList.remove('border-indigo-500'));
+    sensorDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      sensorDropZone.classList.remove('border-indigo-500');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) parseAndApplySensorFile(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById('cameraBtn').addEventListener('click', async () => {
+      const video = document.getElementById('webcamVideo');
+      if (webcamStream) {
+        const side = Math.min(video.videoWidth, video.videoHeight);
+        const sx = (video.videoWidth - side) / 2;
+        const sy = (video.videoHeight - side) / 2;
+        sourceCtx.drawImage(video, sx, sy, side, side, 0, 0, 224, 224);
+        const captured = new Image();
+        captured.onload = () => {
+          stopWebcam();
+          drawUploadedImageToCanvas(captured);
+          triggerPhotoAnalyseAnimation();
+        };
+        captured.src = sourceCanvas.toDataURL('image/png');
+        return;
+      }
+      try {
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = webcamStream;
+        video.classList.remove('hidden');
+        canvas.classList.add('hidden');
+        document.getElementById('cameraBtnText').textContent = 'Capture';
+        showToast('Camera active · Click "Capture"');
+      } catch (err) {
+        showToast('Camera unavailable — opening file picker');
+        fileInput.click();
+      }
+    });
+
+    // Populate Hidden Expandable NASA Citations Drawer
+    document.getElementById('nasaCitationsList').innerHTML = CONDITIONS.map(c => `
+      <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-1">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-bold text-slate-800 dark:text-slate-100">${c.name}</span>
+          <span class="font-mono text-[10px] text-slate-400">ICD-11: ${c.icd11}</span>
+        </div>
+        <p class="text-[11px] font-medium text-sky-600 dark:text-sky-400">${c.nasa_incidence}</p>
+        <p class="text-[11px] text-slate-600 dark:text-slate-400">${c.nasa_evidence}</p>
+        <p class="text-[10px] font-mono text-slate-400 pt-0.5">${c.nasa_citation}</p>
+      </div>
+    `).join('');
+
+    document.getElementById('nasaToggleBtn').addEventListener('click', () => {
+      const drawer = document.getElementById('nasaDrawer');
+      const chevron = document.getElementById('nasaChevron');
+      const isHidden = drawer.classList.toggle('hidden');
+      chevron.textContent = isHidden ? '▸' : '▾';
+    });
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const html = document.documentElement;
+      html.classList.toggle('dark');
+      document.getElementById('themeIcon').textContent = html.classList.contains('dark') ? '☀️' : '🌙';
+    });
+
+    // Initialize clean baseline
+    drawCleanBaseline();
+  </script>
+</body>
+</html>

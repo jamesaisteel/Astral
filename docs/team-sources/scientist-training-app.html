@@ -1,0 +1,616 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Astronaut Training: Scientist view</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#14192b;--mu:#5d6580;--ac:#2f5bea;--bd:#dfe4f0;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1220;--card:#171d31;--tx:#e8ecf8;--mu:#9aa3c0;--ac:#6f93ff;--bd:#2a3350;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:14px;max-width:1100px;margin:auto}
+h1{font-size:20px;margin:6px 0}h2{font-size:16px;margin:0 0 8px}h3{font-size:14px;margin:12px 0 4px}.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}label{display:block;font-size:12px;color:var(--mu)}
+input,select,textarea{width:100%;padding:7px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+button{padding:7px 12px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;cursor:pointer;margin:2px}button.on{outline:2px solid var(--tx)}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}.note{color:var(--mu);font-size:12.5px;margin:6px 0}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:5px 7px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--mu);font-weight:600}
+.scr{display:grid;grid-template-columns:1fr 110px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd);font-size:13px}.scr select{width:100%}.diag{border-left:4px solid var(--ac);padding:8px 10px;margin:6px 0;background:var(--bg);border-radius:8px}.diag.high{border-color:#c2362b}
+ul.f{padding-left:18px;margin:0}ul.f li{margin:3px 0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+</style></head><body><h1>Astronaut Training: Scientist view</h1><div class="row" id="tabs"></div><div id="body"></div>
+<script>
+const KEY="astro_v2";
+let DB; try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!DB||!DB.a) DB={a:{},cur:""};
+function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+const DEF={name:"Demo Astronaut",sex:1,m:80,age:42,h:180,bf:18,vo2:46,sq:140,dl:170,bp:100,ohp:62,row:75,cur:35,max:273,hf:70,days:180,bmd:1.0};
+const C={epley:30,eff:.22,ecc:1.33,after:1.06,boneExp:4,earthRef:16589,restKcal:2,actF:1.25,
+  Kbig:8,Kupper:6,baseSpin:1.2,overheadMin:13,overheadPer:1.5,ht:208,hf:.7,
+  fitsRun:1.8,fitsWalk:1.1,stepsMin:170,plantarK:.2,cycleK:1.8};
+const EX={
+ sq:{n:"Squat",b:"sq",f:1,d:.55,ax:1,mu:{Quads:1,Glutes:1,Hamstrings:.3,Core:.4,Back:.2},
+   rom:"Thighs reach parallel or lower; hip crease passes the top of the knee.",
+   setup:"Bar on upper traps (ARED barbell), feet shoulder-width, toes out 15-30 degrees.",
+   move:"Brace the core, sit between the hips, drive through the mid-foot back to a tall lockout.",
+   watch:["Knees track over the middle toes","Chest up, no forward pitch against the harness","Do not bounce at the bottom"]},
+ dl:{n:"Deadlift",b:"dl",f:1,d:.5,ax:1,mu:{Glutes:1,Hamstrings:1,Back:1,Quads:.5,Core:.4},
+   rom:"Hip hinge from the floor to full hip and knee lockout.",
+   setup:"Bar over mid-foot, shins close to the bar, shoulders just ahead of it.",
+   move:"Push the floor away, keep the bar against shins and thighs, finish by squeezing the glutes.",
+   watch:["Neutral spine throughout","Do not lean back at the top","Hips and shoulders rise together"]},
+ hr:{n:"Seated heel raise (soleus focus)",b:"sq",f:.9,d:.1,ax:1,mu:{Calves:1},
+   rom:"Full stretch at the bottom, full plantar-flexion at the top.",
+   setup:"Ball of foot on the platform, knees bent to 90 degrees to load the soleus.",
+   move:"Press up slowly for 3 s, pause 1 s, lower for 3 s.",
+   watch:["Full ankle range, no bouncing","Heels stay in contact with the lever","Keep the knees still"]},
+ bp:{n:"Bench press",b:"bp",f:1,d:.4,ax:0,mu:{Chest:1,Shoulders:.5,Arms:.5},
+   rom:"Bar to lower chest (elbows about 90 degrees), press to full elbow lockout.",
+   setup:"Shoulder blades pinched, feet flat, restraint straps on.",
+   move:"Lower under control to lower chest, press to lockout.",
+   watch:["Elbows 45-60 degrees from the body","Wrists stacked over elbows","No bounce off the chest"]},
+ row:{n:"Bent-over row",b:"bp",f:.75,d:.4,ax:0,mu:{Back:1,Arms:.5,Shoulders:.3},
+   rom:"Elbow passes the torso line; shoulder blades fully retracted.",
+   setup:"Hinge to about 45 degrees, back flat, knees soft.",
+   move:"Pull the bar to the lower ribs, pause 1 s, lower fully.",
+   watch:["No momentum from the hips","Elbows close to the body","Shoulders stay down"]},
+ ohp:{n:"Overhead press",b:"bp",f:.62,d:.5,ax:1,mu:{Shoulders:1,Arms:.5,Core:.3},
+   rom:"Bar from collarbone to full overhead lockout.",
+   setup:"Feet hip-width, glutes and ribs tight.",
+   move:"Press straight up, head moves through at the top, lock out over mid-foot.",
+   watch:["No back arch","Bar path straight","Ribs stay down"]},
+ cur:{n:"Biceps curl",b:"bp",f:.35,d:.45,ax:0,mu:{Arms:1},
+   rom:"Elbow from full extension to about 145 degrees flexion.",
+   setup:"Elbows pinned beside the ribs.",
+   move:"Curl up, lower for 4 s.",
+   watch:["No swinging","Full extension at the bottom"]}
+};
+EX.ohp.own="ohp";EX.row.own="row";EX.cur.own="cur";
+const LOWER=["sq","dl","hr"];
+function segScale(k,p){ const sg=p.seg||{}; if(LOWER.includes(k)) return sg.femur?sg.femur/45:1; return sg.arm?sg.arm/30:1; }
+const RUN_FORM=["Harness snug so feet stay planted; load set to your harness %","Upright, mid-foot strike, about 170 steps per minute","Arms relaxed at about 90 degrees, hands off handrails"];
+const CYC_FORM=["Seat height so the knee is about 25-35 degrees at the bottom","Smooth circles at 85-95 rpm, straps snug","Relaxed shoulders and neck"];
+const IVS=[{n:"4 x (4 min hard + 3 min easy)",seg:[[5,.55],...Array.from({length:4},()=>[[4,.9],[3,.6]]).flat(),[3,.5]]},
+           {n:"6 x (2 min hard + 2 min easy)",seg:[[5,.55],...Array.from({length:6},()=>[[2,.92],[2,.6]]).flat(),[3,.5]]},
+           {n:"8 x (30 s hard + 60 s easy)",seg:[[5,.55],...Array.from({length:8},()=>[[.5,.95],[1,.6]]).flat(),[3,.5]]}];
+const REPS=[[12,.65,90],[8,.75,150],[6,.83,180]];
+const BASE_MUS={Quads:[2.2,13],Hamstrings:[1.8,6],Glutes:[1.8,10],Calves:[3,6],Back:[2.2,20],Core:[1.5,8],Chest:[.8,7],Shoulders:[.8,8],Arms:[.6,10]};
+
+function sessionsDone(){ return (DB.a[DB.cur]?.logs||[]).filter(l=>l.type==="session").length; }
+function plan(p,n,adj){
+  if(p.plan) return planWith(p,n,{...DEFAULT_OPT,...p.plan,pctLift:(adj&&adj.pctLift)||0,heelSets:(adj&&adj.heelSets)||0});
+  const R=REPS[n%3], iv=IVS[Math.floor(n/2)%3];
+  const lp=R[1]+((adj&&adj.pctLift)||0), hs=4+((adj&&adj.heelSets)||0);
+  const A=[{k:"sq",s:4,rp:R[0],pc:lp,rs:R[2],tp:4},{k:"dl",s:4,rp:R[0],pc:lp,rs:R[2],tp:4},
+           {k:"hr",s:hs,rp:15,pc:.57,rs:60,tp:6},
+           {cardio:"tm",name:"Treadmill intervals",d:iv.n,seg:iv.seg}];
+  const B=[{k:"bp",s:4,rp:8,pc:.72,rs:90,tp:4},{k:"row",s:4,rp:8,pc:.75,rs:90,tp:4},
+           {k:"ohp",s:3,rp:8,pc:.72,rs:90,tp:4},{k:"cur",s:2,rp:12,pc:.65,rs:60,tp:4},
+           {cardio:"tm",name:"Treadmill steady run",d:"30 min continuous at 75% VO2max",seg:[[3,.5],[27,.75]]},
+           {cardio:"cy",name:"Cycle ergometer",d:"15 min easy",seg:[[3,.5],[12,.6]]}];
+  return {A:calcSession(p,A),B:calcSession(p,B),iv:iv.n,rep:R};
+}
+function liftCalc(p,e){
+  const x=EX[e.k], rm=(x.own&&p[x.own])?p[x.own]:p[x.b]*x.f, effMax=p.max*(p.machineFactor||1), ld=Math.min(effMax,Math.round(e.pc*rm/2.5)*2.5);
+  const mx=C.epley*(rm/ld-1), rir=Math.max(0,Math.round(mx-e.rp));
+  const dd=x.d*segScale(e.k,p), t=e.s*(e.rp*e.tp+e.rs)/60, wk=ld*9.81*dd*e.rp*e.s*C.ecc;
+  const kc=(wk/C.eff/4184+2*p.m*e.s*e.rs/3600)*C.after;
+  const bone=x.ax? e.s*e.rp*Math.pow(ld/p.m,C.boneExp):0;
+  const mu={}; for(const g in x.mu) mu[g]=x.mu[g]*e.s;
+  return {type:"lift",k:e.k,name:x.n,s:e.s,rp:e.rp,pc:e.pc,rs:e.rs,tp:e.tp,rm,ld,rir,t,wk,kc,bone,mu,x};
+}
+function cardioCalc(p,e){
+  const hmax=C.ht-C.hf*p.age; let kc=0,t=0,bone=0,hi=0; const rows=[];
+  const harnessFr=p.hf/100;
+  for(const [m,pc] of e.seg){
+    const vo=pc*p.vo2, k=vo*p.m*m*5/1000, hr=Math.round(hmax*(.64*pc+.37));
+    kc+=k; t+=m; if(pc>=.85) hi+=m;
+    if(e.cardio==="tm"){
+      const sp=(vo-3.5)/(C.plantarK*(.4+.6*harnessFr))*.06, fr=(pc>=.55?C.fitsRun:C.fitsWalk)*harnessFr;
+      const b=170*m*Math.pow(fr,4); bone+=b;
+      rows.push({m,pc,vo,txt:sp.toFixed(1)+" km/h",hr,k,b});
+    } else {
+      const w=(vo-7)*p.m/C.cycleK/6.12; rows.push({m,pc,vo,txt:Math.round(w)+" W",hr,k,b:0});
+    }
+  }
+  return {type:"cardio",cardio:e.cardio,name:e.name,d:e.d,t,kc,bone,hi,rows,mu:{}, s:0, rs:0};
+}
+function calcSession(p,list){
+  const items=list.map(e=>e.cardio?cardioCalc(p,e):liftCalc(p,e));
+  const ov=C.overheadMin+C.overheadPer*items.length;
+  return {items,ov,t:items.reduce((a,i)=>a+i.t,0)+ov,
+    kc:items.reduce((a,i)=>a+i.kc,0),bone:items.reduce((a,i)=>a+i.bone,0),
+    hi:items.reduce((a,i)=>a+(i.hi||0),0), cm:items.filter(i=>i.type==="cardio").reduce((a,i)=>a+i.t,0)};
+}
+const EARTH=8000*Math.pow(1.2,4);
+function forecastModel(p,A,B,days,rf){
+  rf=rf||(p.plan&&p.plan.rf)||3;
+  const mo=days/30.4, gl={}; for(const g in BASE_MUS) gl[g]=0;
+  for(const s of [A,B]) for(const i of s.items){
+    for(const g in i.mu) gl[g]+=rf*i.mu[g];
+    if(i.type==="cardio"&&i.cardio==="tm") for(const g of ["Calves","Quads","Glutes","Hamstrings"]) gl[g]+=rf*({Calves:1,Quads:.5,Glutes:.5,Hamstrings:.5})[g]*i.t/10;
+  }
+  const muscles=[];
+  for(const g in BASE_MUS){
+    const [b,sh]=BASE_MUS[g], S=gl[g], K=["Chest","Shoulders","Arms"].includes(g)?C.Kupper:C.Kbig;
+    const d=-b+(b+C.baseSpin)*S/(S+K); const smm=p.lean?p.lean*.5:p.m*(1-p.bf/100)*.5;
+    muscles.push({g,S,b,d,kg:smm*sh/100*d/100,sh,K});
+  }
+  const sbn=(s,f)=>s.items.filter(f).reduce((a,i)=>a+i.bone,0);
+  const run=rf*(sbn(A,i=>i.type==="cardio")+sbn(B,i=>i.type==="cardio"))/7;
+  const lift=rf*(sbn(A,i=>i.type==="lift")+sbn(B,i=>i.type==="lift"))/7;
+  const heel=rf*sbn(A,i=>i.k==="hr")/7;
+  const up=rf*[A,B].reduce((t,s)=>t+s.items.filter(i=>["bp","row","ohp","cur"].includes(i.k)).reduce((a,i)=>a+i.s*i.rp*Math.pow(i.ld/p.m,2),0),0);
+  const sites=[["Femoral neck / hip",1.5,(run+lift)/C.earthRef,.4],["Lumbar spine",1.0,(lift+.4*run)/C.earthRef,.4],
+               ["Tibia / heel",1.2,(run+rf*heel)/C.earthRef,.4],["Radius / arm",.3,up/250,.5]]
+    .map(([n,b,r,k])=>({n,b,r,k,monthly:b/(1+Math.pow(r/k,2))}));
+  const hi=rf*A.hi, cw=rf*(A.cm+B.cm), dv=-1.2+.9*Math.min(1,hi/30)+.5*Math.min(1,cw/150);
+  const kcalDay=rf*(A.kc+B.kc)/7;
+  return {mo,muscles,sites,dv,kcalDay,hi,cw,run,lift,heel,up};
+}
+function nutritionModel(p,A,B){
+  const rmr=10*p.m+6.25*p.h-5*p.age+(p.sex==1?5:-161), b0=rmr*C.actF;
+  const rows=[["Session A",A.kc,1.6,5],["Session B",B.kc,1.6,4.5],["Rest day",0,1.4,3.5]].map(([n,ex,pr,cb])=>{
+    const k=b0+ex, pg=pr*p.m, cg=cb*p.m, fg=(k-4*pg-4*cg)/9;
+    return {n,kcal:k,protein:pg,carbs:cg,fat:fg,water:(35*p.m+650*(n==="Rest day"?0:(n==="Session A"?A.t:B.t)/60))/1000};
+  });
+  return {rmr,rows};
+}
+function diagnose(e,ctx){
+  const out=[], r=e.reasons||[];
+  if(e.status==="fail"){
+    if(r.includes("Joint or muscle pain")) out.push(["Stop this exercise today. Pain is a safety signal: report it to your flight surgeon and use the cycle instead.","high"]);
+    if(r.includes("Harness or bungee slipped")) out.push(["Re-check harness fit and C-clips before the next set. If it keeps slipping, ask the ground team to inspect the device.","high"]);
+    if(ctx.sleep!=null&&ctx.sleep<6.5) out.push([`Sleep was ${ctx.sleep} h (under 6.5 h). Your rule: cut this session's sets by 30%.`,"likely"]);
+    if(ctx.food!=null&&ctx.food<80) out.push([`Intake was about ${ctx.food}% of target. Eat a carb snack 1-2 h before lifting and log meals.`,"likely"]);
+    if(ctx.sore!=null&&ctx.sore>=7) out.push([`Soreness was ${ctx.sore}/10. Use lighter loads or a 30 min easy cycle.`,"likely"]);
+    if(r.includes("Not enough rest")) out.push(["Hold the full rest shown on the card before the next set.","likely"]);
+    if(r.includes("Form broke down")) out.push(["Lower the load by 5%, slow the tempo, and keep the back neutral.","likely"]);
+    if(r.includes("Tired / low motivation")) out.push(["Fatigue: check sleep and food first; an easier session is fine.","possible"]);
+    if(r.includes("Load too heavy")) out.push(["Reduce the load by 5% and rebuild over the next two sessions.","likely"]);
+    if(ctx.repeat>=2) out.push([`This exercise has failed ${ctx.repeat} times in 14 days. Reduce the load by 5-10% until it is clean twice.`,"likely"]);
+    if(r.includes("Other")||out.length===0) out.push(["No single cause in the logs. Reduce the load by 2.5-5% and recheck next session.","possible"]);
+  } else if(e.status==="nofeel"){
+    if(r.includes("Harness too loose")) out.push(["Tighten the harness. If you float, the working muscles cannot take the full load.","high"]);
+    if(r.includes("Range of motion too short")) out.push(["Use the full range shown on the form card; the stretch and the lockout are where the load works.","likely"]);
+    if(r.includes("Tempo too fast")) out.push(["Use the tempo on the card (slow lowering). Most of the load works on the lowering phase.","likely"]);
+    if(r.includes("Load too light")) out.push(["If you had 4 or more reps in reserve, add 2.5-5% next session.","likely"]);
+    if(r.includes("Wrong muscle working")) out.push(["Re-read the watch-points on the form card and set up again before the next set.","likely"]);
+    if(r.includes("Equipment felt wrong")) out.push(["Report the equipment to the ground team before the next session.","high"]);
+    if(out.length===0) out.push(["Try one step heavier next time and concentrate on the first cue on the form card.","possible"]);
+  }
+  return out;
+}
+const FAIL_REASONS=["Load too heavy","Not enough rest","Poor sleep","Under-fuelled / dehydrated","Joint or muscle pain","Harness or bungee slipped","Form broke down","Tired / low motivation","Other"];
+const NOFEEL_REASONS=["Harness too loose","Range of motion too short","Tempo too fast","Load too light","Wrong muscle working","Equipment felt wrong","Other"];
+
+// ---------- v2: adaptive loading, targets, demo, checks ----------
+const STD={femNeck:90,hipSpine:95};   // NASA-STD-3001 retained BMD (%)
+function measurements(){ return (DB.a[DB.cur]&&DB.a[DB.cur].meas)||[]; }
+// Fluid shift: leg volume falls about 12% (2 L) within hours of launch, and body mass falls with
+// plasma volume in the first weeks (Moore 1987; Thornton 1975; Frontiers 2017).
+// Readings in these windows are monitored closely (early tissue change is real), but mass changes
+// in the window are mostly fluid, so they are not used to change the energy target.
+const FLUID_DAYS=14;
+function dayOf(s){ return Date.parse(s)/864e5; }
+function inFluid(date,p){
+  p=p||(DB.a[DB.cur]&&DB.a[DB.cur].p)||{};
+  const d=dayOf(date);
+  if(p.launch && d>=dayOf(p.launch) && d-dayOf(p.launch)<FLUID_DAYS) return true;
+  if(p.landing && d>=dayOf(p.landing) && d-dayOf(p.landing)<FLUID_DAYS) return true;
+  return false;
+}
+function dxaPair(p){
+  // ISS practice: one DXA before launch (about 90 days) and one 7 to 14 days after landing.
+  const m=measurements().filter(x=>x.fn!=null);
+  const pre=m.find(x=>p.launch && dayOf(x.date)<dayOf(p.launch));
+  const post=m.filter(x=>p.landing && dayOf(x.date)>=dayOf(p.landing)).pop();
+  return {pre,post};
+}
+function calibration(p){
+  const {pre,post}=dxaPair(p);
+  const out={k:1,n:(pre?1:0)+(post?1:0),measured:null,pred:null,days:0};
+  if(!pre||!post) return out;
+  const days=dayOf(post.date)-dayOf(pre.date);
+  const pl=plan(p,sessionsDone()), fc=forecastModel(p,pl.A,pl.B,p.days);
+  const pred=-fc.sites[0].monthly*days/30.4, meas=100*(post.fn-pre.fn)/pre.fn;
+  out.days=days; out.measured=meas; out.pred=pred;
+  if(pred<-0.05) out.k=Math.min(2,Math.max(.5,meas/pred));
+  return out;
+}
+function adjustments(p){
+  const cal=calibration(p), m=measurements(), out={pctLift:0,heelSets:0,notes:[],cal};
+  const pl=plan(p,sessionsDone()), fc=forecastModel(p,pl.A,pl.B,p.days);
+  const projFN=fc.sites[0].monthly*fc.mo*cal.k, limit=100-STD.femNeck;
+  out.projFN=projFN; out.k=cal.k;
+  if(projFN>0.7*limit){ out.pctLift=0.025; out.notes.push(`Projected femoral neck loss ${projFN.toFixed(1)}% is above 70% of the ${limit}% limit. Squat and deadlift loads are raised 2.5% this block.`); }
+  else out.notes.push(`Projected femoral neck loss ${projFN.toFixed(1)}% is within the ${limit}% limit. No load change.`);
+  const h=m.filter(x=>x.heel!=null);
+  if(h.length>=2&&h[h.length-1].heel<0.9*h[0].heel){ out.heelSets=1; out.notes.push("Heel-raise reps have fallen more than 10% since the first test. One extra heel-raise set is added. Readings from the first 14 days are included: early change is real."); }
+  if(!p.launch) out.notes.push("Enter the launch date. Readings in the first 14 days after launch and landing are excluded because they measure fluid, not tissue.");
+  if(cal.n<2) out.notes.push("Calibration needs the pre-flight DXA and the post-flight DXA (7 to 14 days after landing). Until then the model uses its predictions only.");
+  else if(cal.measured!=null) out.notes.push(`Measured femoral neck change ${cal.measured.toFixed(1)}% against a predicted ${cal.pred.toFixed(1)}% over the mission (calibration ${cal.k.toFixed(2)}).`);
+  return out;
+}
+function selfTest(p){
+  const rows=[]; const add=(n,ok,d)=>rows.push([n,ok,d]);
+  let worst=0, minT=1e9, maxT=0, minE=1e9, maxBone=0, maxMu=0;
+  for(let n=0;n<6;n++){ const pl=plan(p,n);
+    for(const S of [pl.A,pl.B]){ minT=Math.min(minT,S.t); maxT=Math.max(maxT,S.t);
+      for(const i of S.items){ if(i.type==="lift"){ worst=Math.max(worst,i.ld-p.max); minE=Math.min(minE,i.kc);} else minE=Math.min(minE,i.kc); } } }
+  add("Working loads within machine limit", worst<=0, worst<=0?"all loads at or below "+p.max+" kg":"a load is "+worst.toFixed(1)+" kg over the limit");
+  add("Session time within 2 h daily limit", maxT<=120, `session time ${minT.toFixed(0)} to ${maxT.toFixed(0)} min`);
+  add("Energy per exercise positive", minE>0, `lowest ${minE.toFixed(1)} kcal`);
+  const pl=plan(p,0), fc=forecastModel(p,pl.A,pl.B,p.days);
+  fc.sites.forEach(s=>{ maxBone=Math.max(maxBone,s.monthly); });
+  add("Bone loss rates between 0 and 3% per month", maxBone<=3, `highest ${maxBone.toFixed(2)}% per month`);
+  fc.muscles.forEach(m=>{ maxMu=Math.max(maxMu,Math.abs(m.d)); });
+  add("Muscle change within plus or minus 5% per month", maxMu<=5, `largest ${maxMu.toFixed(2)}% per month`);
+  const nu=nutritionModel(p,pl.A,pl.B), minProt=Math.min(...nu.rows.map(r=>r.protein))/p.m;
+  add("Protein at least 1.2 g per kg on every day type", minProt>=1.2, `lowest ${minProt.toFixed(2)} g/kg`);
+  const hr=pl.A.items.find(i=>i.k==="hr");
+  add("Heel-raise tempo at least 3 s per rep", !!hr && hr.tp>=3, hr?`${hr.tp} s per rep`:"no heel raise in session A");
+  const pass=rows.filter(r=>r[1]).length;
+  return {rows,pass,total:rows.length};
+}
+function loadDemo(){
+  const name="Demo Astronaut", p={...DEF,name,launch:null,landing:null}, logs=[];
+  const day=k=>new Date(Date.now()-k*864e5).toISOString().slice(0,10);
+  for(let i=0;i<6;i++){
+    const d=day(12-2*i), sess=i%2?"B":"A", pl=plan(p,i), S=sess==="A"?pl.A:pl.B;
+    logs.push({type:"check",n:i,date:d,sleep:i===2?5.5:7.5,food:i===3?75:95,sore:i===2?7:2,weight:+(80-0.1*i-(i<3?0.6:0)).toFixed(1),time:"Morning",hr:[58,59,58,66,67,60][i],dizzy:[0,0,1,2,1,0][i]});
+    S.items.filter(x=>x.type==="lift").forEach(x=>{
+      for(let s=1;s<=x.s;s++){
+        let status="ok", reasons=[], diag=[];
+        if(i===2&&x.k==="sq"&&s===4){ status="fail"; reasons=["Poor sleep"]; diag=[["Sleep was 5.5 h (under 6.5 h). Your rule: cut this session's sets by 30%.","likely"]]; }
+        if(i===4&&x.k==="hr"&&s===2){ status="nofeel"; reasons=["Range of motion too short"]; diag=[["Use the full range shown on the form card.","likely"]]; }
+        logs.push({type:"set",date:d,sess,ex:x.k,set:s,status,reasons,diag,time:"Morning",n:i});
+      }
+    });
+    logs.push({type:"cardio",date:d,sess,ex:"tm",n:i});
+    logs.push({type:"session",date:d,sess,kcal:Math.round(S.kc),min:Math.round(S.t),bone:Math.round(S.bone),n:i+1});
+  }
+  p.screening={answers:Object.fromEntries(SCREEN_Q.map(([id])=>[id,"No"])),signedBy:"Demo sign-off (not a real clearance)",date:day(30)};
+  p.timeAvail=120; p.machineFactor=1; p.hrRest=58; p.heelBase=28;
+  p.launch=day(13); // demo: launch 13 days ago, so all six sessions sit in the first 14 days (early watch shows)
+  DB.a[name]={p,logs,meas:[{date:day(35),fn:0.862,ls:1.067,calf:36.0,heel:28},{date:day(1),fn:0.848,ls:1.052,calf:35.6,heel:25}]};
+  DB.cur=name; save(); return name;
+}
+
+// ---------- v4: intake, screening gate ----------
+const SCREEN_Q=[
+ ["heart","Has a doctor ever said you have a heart condition or high blood pressure?"],
+ ["chest","Do you have chest pain or pressure during activity or at rest?"],
+ ["faint","Have you fainted or nearly fainted, especially on standing?"],
+ ["breath","Do you get short of breath at rest or with mild effort?"],
+ ["metab","Do you have diabetes, thyroid disease or another metabolic condition?"],
+ ["bone","Have you had a fracture in the last 12 months, or been told you have low bone density or osteoporosis?"],
+ ["joint","Do you have a joint, back, hip, knee or ankle problem that limits movement?"],
+ ["meds","Do you take medicines for blood pressure, the heart, blood thinning, diabetes or bone?"],
+ ["surg","Have you had surgery in the last 6 months?"],
+ ["preg","Are you pregnant, or could you be?"],
+ ["ill","Have you had a fever or a significant illness in the last 7 days?"],
+ ["other","Is there any other condition a physician should review before exercise?"]];
+function screenStatus(p){
+  const sc=p.screening||{}, a=sc.answers||{};
+  const answered=SCREEN_Q.every(([id])=>a[id]==="No"||a[id]==="Yes");
+  if(!answered) return {code:"incomplete",text:"Screening questions not all answered."};
+  if(SCREEN_Q.some(([id])=>a[id]==="Yes")) return {code:"referred",text:"A question was answered Yes. No prescription until a clinician has reviewed the case."};
+  if(!sc.signedBy) return {code:"awaiting",text:"All answers are No. Awaiting clinician sign-off before any prescription."};
+  return {code:"cleared",text:`Cleared by ${sc.signedBy} on ${sc.date||"unknown date"}.`};
+}
+function cleared(p){ return screenStatus(p).code==="cleared"; }
+const REQUIRED=[["m","Body mass (kg)"],["age","Age"],["h","Height (cm)"],["sex","Sex"],["bf","Body fat (%)"],["vo2","VO2max (ml/kg/min)"],
+  ["sq","Squat 1RM (kg)"],["dl","Deadlift 1RM (kg)"],["bp","Bench 1RM (kg)"],["ohp","Overhead press 1RM (kg)"],["row","Row 1RM (kg)"],["cur","Curl 1RM (kg)"],
+  ["max","Lift machine maximum (kg)"],["hf","Treadmill harness (% body weight)"],["days","Mission length (days)"]];
+function missingIntake(p){ return REQUIRED.filter(([k])=>p[k]==null||p[k]===""||isNaN(p[k])).map(([k,l])=>l); }
+
+// ---------- v5: shortest effective plan ----------
+const DEFAULT_OPT={sets:4,heel:4,steady:30,cyc:15,rf:3,pctLift:0,heelSets:0};
+function planWith(p,n,o){
+  const R=REPS[n%3], iv=o.ivSeg?{n:o.ivName||"Easy intervals",seg:o.ivSeg}:IVS[Math.floor(n/2)%3], lp=R[1]+(o.pctLift||0), sets=o.sets, hs=o.heel+(o.heelSets||0);
+  const A=[{k:"sq",s:sets,rp:R[0],pc:lp,rs:R[2],tp:4},{k:"dl",s:sets,rp:R[0],pc:lp,rs:R[2],tp:4},
+           {k:"hr",s:hs,rp:15,pc:.57,rs:60,tp:6},{cardio:"tm",name:"Treadmill intervals",d:iv.n,seg:iv.seg}];
+  const B=[{k:"bp",s:sets,rp:8,pc:.72,rs:90,tp:4},{k:"row",s:sets,rp:8,pc:.75,rs:90,tp:4},
+           {k:"ohp",s:Math.max(2,sets-1),rp:8,pc:.72,rs:90,tp:4},{k:"cur",s:2,rp:12,pc:.65,rs:60,tp:4},
+           {cardio:"tm",name:"Treadmill steady run",d:o.steady+" min continuous at 75% VO2max",seg:[[3,.5],[o.steady-3,.75]]}];
+  if(o.cyc>0) B.push({cardio:"cy",name:"Cycle ergometer",d:o.cyc+" min easy",seg:[[3,.5],[o.cyc-3,.6]]});
+  return {A:calcSession(p,A),B:calcSession(p,B),iv:iv.n,rep:R};
+}
+function planTargets(p){
+  const t=p.targets||{}, a=p.about||{};
+  return {femNeck:t.femNeck??10, lumbar:t.lumbar??5, muMin:t.muMin??-0.5, vo2Min:t.vo2Min??0, // defaults are the NASA-STD-3001 limits
+          timeAvail:p.timeAvail||a.minPerDay||120, daysPerWeek:a.daysPerWeek||6};
+}
+function evaluateOpt(p,o){
+  const pl=planWith(p,0,o), fc=forecastModel(p,pl.A,pl.B,p.days,o.rf);
+  return {o,pl,fc,fn:fc.sites[0].monthly*fc.mo, ls:fc.sites[1].monthly*fc.mo,
+          minMu:Math.min(...fc.muscles.map(m=>m.d)), vo2:fc.dv, weekMin:o.rf*(pl.A.t+pl.B.t), sessMax:Math.max(pl.A.t,pl.B.t)};
+}
+function optimizePlan(p){
+  const T=planTargets(p), grid=[];
+  const rfs=[2,3].filter(r=>2*r<=T.daysPerWeek);
+  for(const sets of [2,3,4]) for(const heel of [3,4]) for(const steady of [20,25,30]) for(const cyc of [0,10,15]) for(const rf of rfs){
+    const e=evaluateOpt(p,{...DEFAULT_OPT,sets,heel,steady,cyc,rf});
+    e.ok=e.fn<=T.femNeck && e.ls<=T.lumbar && e.minMu>=T.muMin && e.vo2>=T.vo2Min && e.sessMax<=T.timeAvail;
+    grid.push(e);
+  }
+  const feas=grid.filter(e=>e.ok).sort((a,b)=>a.weekMin-b.weekMin||b.minMu-a.minMu);
+  return {best:feas[0]||null, feasible:feas.length, total:grid.length, T, rfs};
+}
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const f1=x=>(Math.round(x*10)/10).toFixed(1), f0=x=>String(Math.round(x));
+let TAB="inputs";
+function prof(){return DB.a[DB.cur]?DB.a[DB.cur].p:null}
+function logs(){return DB.a[DB.cur]?DB.a[DB.cur].logs:[]}
+const TABS=[["intake","Intake and screening"],["inputs","Inputs and constants"],["workout","Workout calculations"],["forecast","Forecast"],["nutrition","Nutrition and rest"],["rehab","Rehabilitation"],["checks","Checks and calibration"],["failures","Logs and failures"],["data","Data"]];
+function render(){
+  const p=prof()||DEF;
+  $("tabs").innerHTML=TABS.map(([k,l])=>`<button class="${TAB===k?"on":""}" onclick="TAB='${k}';render()">${l}</button>`).join("");
+  const fn={intake,inputs,workout,forecast,nutrition,rehab,checks,failures,data}[TAB];
+  $("body").innerHTML=fn(p);
+}
+
+function getPath(o,k){ return k.split(".").reduce((a,b)=>a&&a[b],o); }
+function setPath(o,k,v){ const ks=k.split("."); let t=o; ks.slice(0,-1).forEach(x=>{ t[x]=t[x]||{}; t=t[x]; }); t[ks[ks.length-1]]=v; }
+function setIn(k,raw,num){ const p=prof(); if(!p) return; const v=num?(raw===""?null:+raw):raw; setPath(p,k,v); save(); render(); }
+function fld(p,k,label,opt){
+  const v=getPath(p,k), o=opt||{};
+  if(o.select) return `<div><label>${label}</label><select onchange="setIn('${k}',this.value,false)">${o.select.map(([val,t])=>`<option value="${val}" ${String(v)===String(val)?"selected":""}>${t}</option>`).join("")}</select></div>`;
+  if(o.text) return `<div><label>${label}</label><input value="${esc(v||"")}" onchange="setIn('${k}',this.value,false)"></div>`;
+  return `<div><label>${label}${o.unit?" ("+o.unit+")":""}</label><input type="number" step="${o.step||"any"}" value="${v??""}" onchange="setIn('${k}',this.value,true)"></div>`;
+}
+function screenCard(p){
+  const sc=p.screening||{answers:{},signedBy:"",date:""}, a=sc.answers||{};
+  const st=screenStatus(p);
+  return `<div class="card"><h2>1. Medical screening (first)</h2>
+   <div class="note">Draft questionnaire for this project. Before real use, replace it with the approved pre-exercise screening form of the mission's medical authority. It has not been checked against a published instrument here.</div>
+   <div class="diag ${st.code==="cleared"?"":"high"}"><b>Status: ${esc(st.code)}.</b> ${esc(st.text)}</div>
+   ${SCREEN_Q.map(([id,q])=>`<div class="scr"><span>${esc(q)}</span><select onchange="setScreen('${id}',this.value)">${["—","No","Yes"].map(v=>`<option ${(a[id]||"—")===v?"selected":""}>${v}</option>`).join("")}</select></div>`).join("")}
+   <div class="grid" style="margin-top:8px"><div><label>Clinician name (sign-off)</label><input value="${esc(sc.signedBy||"")}" onchange="setScreenMeta('signedBy',this.value)"></div>
+   <div><label>Sign-off date</label><input type="date" value="${sc.date||""}" onchange="setScreenMeta('date',this.value)"></div></div></div>`;
+}
+function setScreen(id,v){ const p=prof(); p.screening=p.screening||{answers:{}}; p.screening.answers=p.screening.answers||{}; p.screening.answers[id]=v==="—"?undefined:v; save(); render(); }
+function setScreenMeta(k,v){ const p=prof(); p.screening=p.screening||{answers:{}}; p.screening[k]=v||null; save(); render(); }
+function intake(p){
+  const miss=missingIntake(p), st=screenStatus(p);
+  const sess=(()=>{ try{ const pl=plan(p,sessionsDone(),adjustments(p)); return {A:pl.A.t,B:pl.B.t}; }catch(e){ return null; } })();
+  const timeWarn=sess&&p.timeAvail&&(sess.A>p.timeAvail||sess.B>p.timeAvail)?`<div class="diag high">Planned session time (${sess.A.toFixed(0)} / ${sess.B.toFixed(0)} min) is more than the ${p.timeAvail} min available per day.</div>`:"";
+  return `${screenCard(p)}
+  <div class="card"><h2>2. Body measurements</h2><div class="grid">
+   ${fld(p,"h","Standing height","cm")}${fld(p,"m","Body mass, fasted, morning","kg")}
+   ${fld(p,"feeding","Feeding state at measurement",{select:[["fasted","Fasted"],["fed","Fed"]]})}
+   ${fld(p,"bf","Body fat","%")}${fld(p,"bfMethod","Body fat method",{select:[["dxa","DXA"],["bia","Bioimpedance"],["skinfold","Skinfold"],["other","Other"]]})}
+   ${fld(p,"lean","Lean mass (DXA, optional)","kg")}
+   ${fld(p,"seg.femur","Femur length (hip to knee)","cm")}${fld(p,"seg.tibia","Tibia length (knee to ankle)","cm")}
+   ${fld(p,"seg.torso","Torso length (hip to shoulder)","cm")}${fld(p,"seg.arm","Upper arm length (shoulder to elbow)","cm")}
+   ${fld(p,"seg.forearm","Forearm length (elbow to wrist)","cm")}${fld(p,"sex","Sex",{select:[[1,"Male"],[2,"Female"]]})}
+   ${fld(p,"age","Age","years")}</div><div class="note">Segment lengths scale the range of motion for each lift. Femur sets the squat and deadlift range; upper arm sets the press, row and curl range. Lean mass replaces the body-fat estimate of muscle mass.</div></div>
+  <div class="card"><h2>3. Strength and function tests</h2><div class="grid">
+   ${fld(p,"sq","Squat 1RM","kg")}${fld(p,"dl","Deadlift 1RM","kg")}${fld(p,"bp","Bench press 1RM","kg")}
+   ${fld(p,"ohp","Overhead press 1RM","kg")}${fld(p,"row","Bent-over row 1RM","kg")}${fld(p,"cur","Biceps curl 1RM","kg")}
+   ${fld(p,"heelBase","Heel raises to failure (baseline)","reps")}${fld(p,"kneeExt","Knee extension 1RM (stored, not yet used)","kg")}
+   ${fld(p,"grip","Grip strength (stored, not yet used)","kg")}${fld(p,"balEO","Single-leg balance, eyes open (stored)","s")}${fld(p,"balEC","Single-leg balance, eyes closed (stored)","s")}</div>
+   <div class="note">Test each 1RM on the machine or barbell the astronaut will use, with a warm-up and a qualified tester. Do not test a 1RM without a spotter or safety stop.</div></div>
+  <div class="card"><h2>4. Aerobic and cardiovascular</h2><div class="grid">
+   ${fld(p,"vo2","VO2max","ml/kg/min")}${fld(p,"vo2Method","VO2max method",{select:[["direct","Direct maximal test"],["submax","Submaximal estimate"]]})}
+   ${fld(p,"hrRest","Resting heart rate","bpm")}${fld(p,"sbp","Resting systolic BP (stored)","mmHg")}${fld(p,"dbp","Resting diastolic BP (stored)","mmHg")}</div></div>
+  <div class="card"><h2>5. Equipment and schedule</h2><div class="grid">
+   ${fld(p,"max","Lift machine maximum","kg")}${fld(p,"machineFactor","Machine calibration factor (1 = exact)","x")}
+   ${fld(p,"hf","Treadmill harness load","% body weight")}${fld(p,"timeAvail","Time available per day for training","min")}
+   ${fld(p,"days","Mission length","days")}${fld(p,"launch","Launch date",{text:true})}${fld(p,"landing","Landing date",{text:true})}
+   ${fld(p,"allergy","Food allergies (stored)",{text:true})}${fld(p,"diet","Food preferences (stored)",{text:true})}</div>
+   <div class="note">Stored for the record: knee extension, grip, balance, resting blood pressure, allergies and food preferences. The model does not use them yet. The machine calibration factor scales every load (1.00 means the machine is exact).</div>${timeWarn}</div>
+  ${targetsIn(p)}
+  <div class="card"><h2>Intake check</h2>
+   ${miss.length?`<div class="diag high">Missing required items: ${miss.map(esc).join(", ")}</div>`:`<div class="diag">All required measurements are entered.</div>`}
+   <div class="note">Training is locked in the astronaut app until screening is cleared. Current status: ${esc(st.code)}.</div></div>`;
+}
+
+function inputs(p){
+  const names=Object.keys(DB.a);
+  const fields=[["m","Body mass (kg)"],["age","Age"],["h","Height (cm)"],["bf","Body fat (%)"],["vo2","VO2max (ml/kg/min)"],["sq","Squat 1RM (kg)"],["dl","Deadlift 1RM (kg)"],["bp","Bench 1RM (kg)"],["max","Lift machine max (kg)"],["hf","Treadmill harness (% BW)"],["days","Mission length (days)"]];
+  const consts=Object.keys(C).map(k=>`<tr><td>${k}</td><td><input type="number" step="any" value="${C[k]}" onchange="C['${k}']=+this.value;render()" style="width:110px"></td></tr>`).join("");
+  return `<div class="card"><h2>Astronaut</h2>
+   <div class="row"><select onchange="DB.cur=this.value;save();render()">${names.map(n=>`<option ${n===DB.cur?"selected":""}>${esc(n)}</option>`).join("")}</select>
+   <input id="nm" placeholder="New name"><button onclick="newAstro()">Add</button></div>
+   <div class="grid">${fields.map(([k,l])=>`<div><label>${l}</label><input type="number" step="any" value="${p[k]}" onchange="setP('${k}',+this.value)"></div>`).join("")}
+   <div><label>Launch date</label><input type="date" value="${p.launch||""}" onchange="setP('launch',this.value||null)"></div>
+   <div><label>Landing date</label><input type="date" value="${p.landing||""}" onchange="setP('landing',this.value||null)"></div>
+   <div><label>Sex</label><select onchange="setP('sex',+this.value)"><option value="1" ${p.sex==1?"selected":""}>Male</option><option value="2" ${p.sex==2?"selected":""}>Female</option></select></div></div>
+   <div class="note">Changing any input recalculates every tab. Logs stay with this astronaut.</div></div>
+   <div class="card"><h2>Model constants (editable)</h2><div class="note">Defaults come from the references in the calculations PDF. Changing one changes every output.</div>
+   <table>${consts}</table></div>`;
+}
+function setP(k,v){ const n=DB.cur; if(!DB.a[n]) return; DB.a[n].p[k]=v; save(); render(); }
+function newAstro(){ const n=($("nm").value||"").trim()||"Astronaut"; DB.a[n]=DB.a[n]||{p:{...DEF,name:n},logs:[]}; DB.cur=n; save(); render(); }
+function calcAll(p){
+  const adj=adjustments(p), pl=plan(p,sessionsDone(),adj), fc=forecastModel(p,pl.A,pl.B,p.days), nu=nutritionModel(p,pl.A,pl.B);
+  return {pl,fc,nu,adj};
+}
+
+let OPT=null;
+function targetsIn(p){
+  return `<div class="card"><h2>6. Targets for the shortest effective plan</h2>
+   <div class="note">The optimiser searches session sets, heel sets, run and cycle minutes, and days per week, and keeps the least-time week that meets these targets in the model. Defaults are NASA-STD-3001 limits (10% femoral neck, 5% hip and spine). Tighter targets can make every plan infeasible in this model: the default plan already sits at 4.0% lumbar loss.</div>
+   <div class="grid">${fld(p,"targets.femNeck","Max femoral neck loss over mission","%")}${fld(p,"targets.lumbar","Max lumbar spine loss over mission","%")}
+   ${fld(p,"targets.muMin","Min muscle change per group","%/month")}${fld(p,"targets.vo2Min","Min aerobic change","%/month")}</div>
+   <div class="row"><button onclick="runOpt()">Find the shortest effective plan</button>${p.plan?`<button class="on" onclick="clearPlan()">Clear saved plan (back to default)</button>`:""}</div>
+   ${OPT?optResult(p):""}</div>`;
+}
+function runOpt(){ const p=prof(); OPT=optimizePlan(p); render(); }
+function applyPlan(){ const p=prof(); if(!OPT||!OPT.best) return; const o=OPT.best.o; p.plan={sets:o.sets,heel:o.heel,steady:o.steady,cyc:o.cyc,rf:o.rf}; save(); render(); }
+function clearPlan(){ const p=prof(); delete p.plan; save(); render(); }
+function optResult(p){
+  if(!OPT.best) return `<div class="diag high">No plan meets all targets (${OPT.feasible} of ${OPT.total} combinations pass). Relax a target, allow more minutes per day, or allow more days.</div>`;
+  const b=OPT.best, o=b.o, T=OPT.T;
+  const cur=optimizePlan.length && evaluateOpt(p,{...DEFAULT_OPT,rf:3});
+  return `<div class="diag">${OPT.feasible} of ${OPT.total} combinations meet the targets. The shortest is shown.</div>
+   <div class="w"><table><tr><th>Item</th><th>Shortest plan</th><th>Default plan (6 days)</th></tr>
+   <tr><td>Days per week</td><td>${2*o.rf}</td><td>6</td></tr>
+   <tr><td>Minutes per week</td><td>${f0(b.weekMin)}</td><td>${f0(cur.weekMin)}</td></tr>
+   <tr><td>Squat and deadlift sets</td><td>${o.sets} x rep scheme</td><td>4</td></tr>
+   <tr><td>Heel-raise sets</td><td>${o.heel}</td><td>4</td></tr>
+   <tr><td>Steady run minutes</td><td>${o.steady}</td><td>30</td></tr>
+   <tr><td>Cycle minutes</td><td>${o.cyc}</td><td>15</td></tr>
+   <tr><td>Femoral neck loss (target max ${T.femNeck}%)</td><td>${b.fn.toFixed(2)}%</td><td>${cur.fn.toFixed(2)}%</td></tr>
+   <tr><td>Lumbar loss (target max ${T.lumbar}%)</td><td>${b.ls.toFixed(2)}%</td><td>${cur.ls.toFixed(2)}%</td></tr>
+   <tr><td>Worst muscle change (target min ${T.muMin}%/mo)</td><td>${b.minMu.toFixed(2)}</td><td>${cur.minMu.toFixed(2)}</td></tr>
+   <tr><td>Aerobic change (target min ${T.vo2Min}%/mo)</td><td>${b.vo2.toFixed(2)}</td><td>${cur.vo2.toFixed(2)}</td></tr></table></div>
+   <div class="row"><button onclick="applyPlan()">Use this plan for the astronaut</button></div>
+   <div class="note">The astronaut app still shows one session each day until the schedule is wired to days per week. The model uses the days per week for its forecasts. Model results only: they are not validated against crew data.</div>`;
+}
+
+function workout(p){
+  const {pl}=calcAll(p);
+  const st=screenStatus(p);
+  const warn=st.code!=="cleared"?`<div class="diag high"><b>Not cleared (${esc(st.code)}).</b> These numbers are for planning and checking only. Do not train from them until the screening is cleared.</div>`:"";
+  const tbl=(S,title)=>`<h3>${title}</h3><div class="w"><table><tr><th>Exercise</th><th>Sets x reps</th><th>Load kg</th><th>Reps in reserve</th><th>Rest s</th><th>Time min</th><th>Work J</th><th>kcal</th><th>Bone dose</th></tr>
+    ${S.items.map(i=>i.type==="lift"?`<tr><td>${esc(i.name)}</td><td>${i.s} x ${i.rp}</td><td>${f1(i.ld)}</td><td>${i.rir}</td><td>${i.rs}</td><td>${f1(i.t)}</td><td>${f0(i.wk)}</td><td>${f1(i.kc)}</td><td>${i.x&&EX[i.k].ax?f0(i.bone):"-"}</td></tr>`:
+      `<tr><td>${esc(i.name)}</td><td colspan="2">${esc(i.d)}</td><td colspan="2">Cardio</td><td>${f1(i.t)}</td><td>-</td><td>${f1(i.kc)}</td><td>${f0(i.bone)}</td></tr>`).join("")}
+    <tr><th>Total</th><td colspan="4">Overhead ${f1(S.ov)} min</td><th>${f1(S.t)}</th><td></td><th>${f0(S.kc)}</th><th>${f0(S.bone)}</th></tr></table></div>`;
+  return `${warn}<div class="card"><h2>Formulas used</h2><ul class="f">
+   <li>Working 1RM = base 1RM x f (f: squat 1, deadlift 1, heel raise 0.9, bench 1, row 0.75, press 0.62, curl 0.35)</li>
+   <li>Load = min(machine max, round(pct x working 1RM / 2.5) x 2.5)</li>
+   <li>Reps to failure = ${C.epley} x (1RM / load - 1); reps in reserve = reps to failure - prescribed reps</li>
+   <li>Time = sets x (reps x seconds per rep + rest) / 60</li>
+   <li>Mechanical work = load x 9.81 x range (m) x reps x sets x ${C.ecc} (eccentric)</li>
+   <li>kcal = (work / ${C.eff} / 4184 + 2 x mass x sets x rest / 3600) x ${C.after}</li>
+   <li>Bone dose = sets x reps x (load / mass)^${C.boneExp} (axial lifts only)</li>
+   <li>Max HR = ${C.ht} - ${C.hf} x age; target HR = maxHR x (0.64 x intensity + 0.37)</li>
+   <li>Treadmill speed = (VO2 - 3.5) / (${C.plantarK} x (0.4 + 0.6 x harness)) x 0.06 km/h; cycle W = (VO2 - 7) x mass / ${C.cycleK} / 6.12</li></ul></div>
+   <div class="card"><h2>Session A and B (today's rotation: logged sessions = ${sessionsDone()})</h2>${tbl(pl.A,"Session A: legs and calves")}${tbl(pl.B,"Session B: upper body and back")}
+   <div class="note">Rep scheme ${pl.rep[0]} at ${Math.round(pl.rep[1]*100)}%, rest ${pl.rep[2]} s. Interval format: ${esc(pl.iv)}.</div></div>`;
+}
+function forecast(p){
+  const {pl,fc}=calcAll(p), mo=fc.mo;
+  return `<div class="card"><h2>Bone (monthly loss, plan vs no exercise)</h2><div class="w"><table>
+   <tr><th>Site</th><th>Reference loss %/mo</th><th>Stimulus R</th><th>Plan %/mo</th><th>Loss by day ${p.days} %</th></tr>
+   ${fc.sites.map(s=>`<tr><td>${s.n}</td><td>-${s.b}</td><td>${s.r.toFixed(2)}</td><td>-${s.monthly.toFixed(2)}</td><td>-${(s.monthly*mo).toFixed(2)}</td></tr>`).join("")}</table></div>
+   <div class="note">R = site dose / ${C.earthRef}. Loss = reference / (1 + (R / K)^2), K = ${0.4} (radius 0.5). Dose formulas are in the calculations PDF.</div></div>
+   <div class="card"><h2>Muscle (every group)</h2><div class="w"><table>
+   <tr><th>Muscle</th><th>Weekly sets S</th><th>K</th><th>No-exercise loss %/mo</th><th>Plan %/mo</th><th>Mass change g by day ${p.days}</th></tr>
+   ${fc.muscles.map(m=>`<tr><td>${m.g}</td><td>${f1(m.S)}</td><td>${m.K}</td><td>-${m.b}</td><td>${m.d>=0?"+":""}${m.d.toFixed(2)}</td><td>${m.kg*mo>=0?"+":""}${f0(m.kg*mo*1000)}</td></tr>`).join("")}</table></div></div>
+   <div class="card"><h2>Aerobic</h2><div class="note">High-intensity minutes per week ${f0(fc.hi*1)} · cardio minutes per week ${f0(fc.cw)} · predicted VO2max change ${fc.dv>=0?"+":""}${fc.dv.toFixed(2)} %/mo</div></div>`;
+}
+function targetsCard(p){
+  const L=logs(), checks=L.filter(l=>l.type==="check"), sets=L.filter(l=>l.type==="set");
+  const cut=Date.now()-14*864e5, inWin=d=>Date.parse(d)>=cut;
+  const recent=checks.filter(c=>inWin(c.date));
+  const avg=(a,f)=>a.length?a.reduce((s,x)=>s+x[f],0)/a.length:null;
+  const sleepAvg=avg(recent.filter(c=>c.sleep!=null),"sleep");
+  const foodAvg=avg(recent.filter(c=>c.food!=null),"food");
+  const pl=plan(p,sessionsDone()), nu=nutritionModel(p,pl.A,pl.B);
+  const notes=[]; let adj=0;
+  // energy from mass trend
+  const w=recent.filter(c=>c.weight).sort((a,b)=>a.date<b.date?-1:1);
+  if(w.length>=2){
+    const weeks=Math.max(1/7,(Date.parse(w[w.length-1].date)-Date.parse(w[0].date))/(7*864e5));
+    const pct=100*((w[w.length-1].weight-w[0].weight)/weeks)/p.m;
+    if(weeks>=1&&pct<-1){adj+=300;notes.push(`Body mass is falling ${Math.abs(pct).toFixed(1)}% a week. Energy target raised by about 300 kcal a day.`);}
+    else if(weeks>=1&&pct>.5){adj-=300;notes.push(`Body mass is rising ${pct.toFixed(1)}% a week. Energy target lowered by about 300 kcal a day unless a gain is planned.`);}
+    else notes.push(`Body mass changes ${pct.toFixed(1)}% a week, within the target range. No energy change.`);
+  } else notes.push("Log your morning body mass on at least two days (about a week apart) and the energy target will adjust to your trend.");
+  if(foodAvg!=null&&foodAvg<80) notes.push(`You eat about ${Math.round(foodAvg)}% of the target. Eat the planned amount first: that is the biggest lever before changing the numbers.`);
+  if(sleepAvg!=null&&sleepAvg<7) notes.push(`You average ${sleepAvg.toFixed(1)} h of sleep. Aim for 7 to 9 h: go to bed 30 minutes earlier for a week and watch the failure rate.`);
+  // sleep vs failures
+  const sleepBy={}; recent.forEach(c=>{if(c.sleep!=null)sleepBy[c.date]=c.sleep;});
+  const sSets=sets.filter(x=>inWin(x.date));
+  const rate=a=>a.length?a.filter(x=>x.status!=="ok").length/a.length:null;
+  const short=rate(sSets.filter(x=>sleepBy[x.date]!=null&&sleepBy[x.date]<6.5));
+  const good=rate(sSets.filter(x=>sleepBy[x.date]!=null&&sleepBy[x.date]>=7));
+  if(short!=null&&good!=null&&sSets.length>=10) notes.push(`Sets after nights under 6.5 h were not right ${Math.round(short*100)}% of the time, against ${Math.round(good*100)}% after 7 h or more.`);
+  // time of day
+  const groups={};
+  sSets.filter(x=>x.time).forEach(x=>{(groups[x.time]=groups[x.time]||[]).push(x);});
+  const tr=Object.entries(groups).filter(([k,v])=>v.length>=10).map(([k,v])=>[k,rate(v)]);
+  if(tr.length>=2){
+    const best=[...tr].sort((a,b)=>a[1]-b[1])[0], worst=[...tr].sort((a,b)=>b[1]-a[1])[0];
+    notes.push(`Best time for you is ${best[0].toLowerCase()} (${Math.round(best[1]*100)}% of sets not right), against ${worst[0].toLowerCase()} (${Math.round(worst[1]*100)}%). Try moving your lifting to the ${best[0].toLowerCase()}.`);
+  } else notes.push("Session time: log a check-in with 'When you train' set for at least two different times, with about 10 sets each, and the app will compare them.");
+  const row=(n,r,k)=>{const kc=r.kcal+adj, P=r.protein, C2=r.carbs, F=(kc-4*P-4*C2)/9; return `<tr><td>${n}</td><td>${Math.round(kc)}</td><td>${Math.round(P)} g</td><td>${Math.round(C2)} g</td><td>${Math.round(F)} g</td><td>${r.water.toFixed(1)} L</td></tr>`;};
+  const basis=`${recent.length} check-ins and ${sSets.length} sets in the last 14 days`;
+  return `<div class="card"><h2>Your targets</h2><div class="note">Based on ${basis}. Targets are estimates: confirm any change with the flight surgeon or dietitian.</div>
+   <div class="w"><table><tr><th>Day</th><th>Energy kcal</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Water</th></tr>
+   ${row("Session A (legs)",nu.rows[0])}${row("Session B (upper body)",nu.rows[1])}${row("Rest day",nu.rows[2])}</table></div>
+   <h3>What to change</h3><ul>${notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>`;
+}
+
+
+function nutrition(p){
+  const {nu}=calcAll(p);
+  return `${targetsCard(p)}<div class="card"><h2>Energy, protein and water</h2><div class="note">RMR (Mifflin-St Jeor) = ${f0(nu.rmr)} kcal; daily energy = RMR x ${C.actF} + session kcal.</div><div class="w"><table>
+   <tr><th>Day</th><th>kcal</th><th>Protein g</th><th>Carbs g</th><th>Fat g</th><th>Water L</th></tr>
+   ${nu.rows.map(r=>`<tr><td>${r.n}</td><td>${f0(r.kcal)}</td><td>${f0(r.protein)}</td><td>${f0(r.carbs)}</td><td>${f0(r.fat)}</td><td>${f1(r.water)}</td></tr>`).join("")}</table></div>
+   <div class="note">Protein 1.6 g/kg training days, 1.4 g/kg rest; carbs 5, 4.5, 3.5 g/kg; water 35 mL/kg + 650 mL per training hour. Sleep 7 to 9 h; under 6.5 h cuts sets by 30% in the astronaut app.</div></div>`;
+}
+const PH=[["1 Readapt","0-2",0,.3],["2 Rebuild base","3-6",.4,.55],["3 Build strength","7-12",.6,.75],["4 Load bones","13-26",.75,.85],["5 Maintain","27+",.8,.85]];
+function rehab(p){
+  const {fc}=calcAll(p), W=+(prof()?.weeks??0);
+  const rg=(m,l)=>l<=0?100:Math.min(100,Math.round((m<=3?2*m:6+(m-3))/l*100));
+  const rb=(m,l)=>l<=0?100:Math.min(100,Math.round(.25*m/l*100));
+  const mr=fc.muscles.map(m=>({n:m.g,l:Math.max(0,-m.d*fc.mo),gm:Math.max(0,-m.kg*fc.mo*1000)}));
+  return `<div class="card"><h2>Return-home phases</h2><div class="row"><label>Weeks since landing</label><input type="number" value="${W}" onchange="DB.a[DB.cur].p.weeks=+this.value;save();render()" style="width:90px"></div>
+   <div class="w"><table><tr><th>Phase</th><th>Weeks</th><th>Squat kg</th><th>Deadlift kg</th><th>Bench kg</th></tr>
+   ${PH.map(x=>`<tr style="${W>=parseInt(x[1])&&W<=(x[1].endsWith("+")?999:parseInt(x[1].split("-")[1]))?"font-weight:700":""}"><td>${x[0]}</td><td>${x[1]}</td><td>${f0(x[2]*p.sq)}-${f0(x[3]*p.sq)}</td><td>${f0(x[2]*p.dl)}-${f0(x[3]*p.dl)}</td><td>${f0(x[2]*p.bp)}-${f0(x[3]*p.bp)}</td></tr>`).join("")}</table></div></div>
+   <div class="card"><h2>Predicted deficit and recovery</h2><div class="w"><table><tr><th>Site</th><th>Lost %</th><th>1 mo</th><th>3 mo</th><th>6 mo</th><th>12 mo</th></tr>
+   ${mr.map(r=>`<tr><td>${r.n}</td><td>${r.l.toFixed(2)}</td>${[1,3,6,12].map(m=>`<td>${rg(m,r.l)}%</td>`).join("")}</tr>`).join("")}
+   ${fc.sites.map(s=>{const l=s.monthly*fc.mo;return `<tr><td>${s.n}</td><td>${l.toFixed(2)}</td>${[1,3,6,12].map(m=>`<td>${rb(m,l)}%</td>`).join("")}</tr>`}).join("")}</table></div>
+   <div class="note">Muscle regain about 2%/mo for 3 months then 1%/mo; bone about 0.25%/mo with impact loading. These are planning rates, not clinical data.</div></div>`;
+}
+function failures(p){
+  const L=logs().filter(l=>l.type==="set");
+  if(!L.length) return `<div class="card"><h2>Logs and failures</h2><div class="note">No set logs yet. Use the astronaut app to log sets.</div></div>`;
+  const count=(arr,f)=>{const m={};arr.forEach(x=>{const k=f(x);m[k]=(m[k]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1])};
+  const bad=L.filter(l=>l.status!=="ok");
+  const reasons=count(bad.flatMap(l=>(l.reasons||[]).map(r=>({r,s:l.status}))),x=>x.s+": "+x.r);
+  const byEx=count(L,x=>x.ex);
+  const exFail=Object.keys(Object.fromEntries(byEx)).map(k=>{const all=L.filter(l=>l.ex===k),f=all.filter(l=>l.status!=="ok").length;return [k,all.length,f]});
+  return `<div class="card"><h2>Failure analysis</h2><div class="note">${bad.length} of ${L.length} logged sets were not right.</div>
+   <div class="w"><table><tr><th>Exercise</th><th>Sets logged</th><th>Not right</th><th>Rate</th></tr>${exFail.map(([k,n,f])=>`<tr><td>${esc(k)}</td><td>${n}</td><td>${f}</td><td>${Math.round(100*f/n)}%</td></tr>`).join("")}</table></div>
+   <h3>Reasons given</h3><div class="w"><table><tr><th>Status: reason</th><th>Count</th></tr>${reasons.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join("")}</table></div>
+   <h3>Raw set log</h3><div class="w"><table><tr><th>Date</th><th>Session</th><th>Exercise</th><th>Set</th><th>Status</th><th>Reasons</th><th>Advice given</th></tr>
+   ${L.slice(-80).reverse().map(l=>`<tr><td>${l.date}</td><td>${l.sess}</td><td>${esc(l.ex)}</td><td>${l.set}</td><td>${l.status}</td><td>${esc((l.reasons||[]).join(", "))}</td><td>${esc((l.diag||[]).join(" | "))}</td></tr>`).join("")}</table></div></div>`;
+}
+
+function checks(p){
+  const {adj}=calcAll(p), t=selfTest(p), m=measurements(), cal=adj.cal;
+  const fl=(d)=>inFluid(d,p)?' (fluid window)':'';
+  const lim=100-STD.femNeck;
+  const meas=m.length?`<div class="w"><table><tr><th>Date</th><th>Femoral neck g/cm²</th><th>Lumbar g/cm²</th><th>Calf cm</th><th>Heel reps</th></tr>${m.map(x=>`<tr><td>${x.date}${fl(x.date)}</td><td>${x.fn??"-"}</td><td>${x.ls??"-"}</td><td>${x.calf??"-"}</td><td>${x.heel??"-"}</td></tr>`).join("")}</table></div>`:`<div class="note">No measurements yet.</div>`;
+  return `<div class="card"><h2>Model self-test</h2><div class="note">${t.pass} of ${t.total} checks pass. These test the model's own outputs against physical and design limits; they do not test accuracy against a crew.</div>
+   <div class="w"><table><tr><th>Check</th><th>Result</th><th>Detail</th></tr>${t.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="${r[1]?"ok":"bad"}">${r[1]?"pass":"fail"}</td><td>${esc(r[2])}</td></tr>`).join("")}</table></div></div>
+   <div class="card"><h2>Calibration to measurements</h2>
+    <div class="note">Calibration k = post-flight DXA change / predicted change over the mission, clipped to 0.5 to 2. It needs the pre-flight and post-flight DXA (7 to 14 days after landing). Until both exist, k = 1.</div>
+    <div class="w"><table><tr><th>Quantity</th><th>Value</th></tr>
+     <tr><td>Days between first and last DXA</td><td>${cal.days?Math.round(cal.days):"-"}</td></tr>
+     <tr><td>Measured femoral neck change</td><td>${cal.measured!=null?cal.measured.toFixed(2)+"%":"-"}</td></tr>
+     <tr><td>Predicted change over same days</td><td>${cal.pred!=null?cal.pred.toFixed(2)+"%":"-"}</td></tr>
+     <tr><td>Calibration k</td><td>${adj.k.toFixed(2)}</td></tr>
+     <tr><td>Projected femoral neck loss at mission end</td><td>${adj.projFN.toFixed(2)}% (limit ${lim}%)</td></tr>
+     <tr><td>Squat and deadlift load change</td><td>${adj.pctLift?"+"+(adj.pctLift*100).toFixed(1)+"%":"none"}</td></tr>
+     <tr><td>Heel-raise sets added</td><td>${adj.heelSets}</td></tr></table></div>
+    <ul>${adj.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>
+   <div class="card"><h2>Measurements</h2>${meas}
+    <div class="grid" style="margin-top:8px">
+     <div><label>Date</label><input id="sd" type="date"></div><div><label>Femoral neck BMD</label><input id="sfn" type="number" step="0.001"></div>
+     <div><label>Lumbar BMD</label><input id="sls" type="number" step="0.001"></div><div><label>Calf cm</label><input id="scalf" type="number" step="0.1"></div>
+     <div><label>Heel reps</label><input id="sheel" type="number"></div></div>
+    <div class="row"><button onclick="addMeasureSci()">Add measurement</button></div></div>`;
+}
+function addMeasureSci(){
+  const v=id=>{const x=$(id).value; return x===""?null:+x;};
+  const d=$("sd").value||new Date().toISOString().slice(0,10);
+  const z=DB.a[DB.cur]; z.meas=z.meas||[]; z.meas.push({date:d,fn:v("sfn"),ls:v("sls"),calf:v("scalf"),heel:v("sheel")}); save(); render();
+}
+function data(p){
+  return `<div class="card"><h2>Export and import</h2><div class="row"><button onclick="exportJSON()">Download JSON</button><button onclick="exportCSV()">Download set log CSV</button><button class="on" onclick="loadDemo();render()">Load demo astronaut</button></div>
+   <label>Paste JSON to import (replaces all stored data)</label><textarea id="imp" rows="5" style="width:100%"></textarea>
+   <div class="row"><button onclick="importJSON()">Import</button></div><div class="note" id="dmsg"></div></div>`;
+}
+function dl(name,text,type){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click(); }
+function exportJSON(){ dl("astronaut-data.json",JSON.stringify(DB,null,2),"application/json"); }
+function exportCSV(){
+  const L=logs().filter(l=>l.type==="set");
+  const rows=[["date","session","exercise","set","status","reasons","advice"].join(",")].concat(L.map(l=>[l.date,l.sess,l.ex,l.set,l.status,(l.reasons||[]).join(";"),(l.diag||[]).join(" | ")].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")));
+  dl("set-log.csv",rows.join("\n"),"text/csv");
+}
+function importJSON(){ try{ const d=JSON.parse($("imp").value); if(!d.a) throw 0; DB=d; save(); $("dmsg").textContent="Imported."; render(); }catch(e){ $("dmsg").textContent="Import failed: not valid data."; } }
+window.addEventListener("load",render);
+
+</script></body></html>
