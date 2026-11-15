@@ -3,7 +3,7 @@
 *A doctor, a coach and a teammate for the crew, light-minutes from Earth.*
 NASA Space Apps Challenge 2026 entry. In the prototype's interface ASTRAL appears under its working name, "Crew Health Monitor".
 
-**Live demo:** https://YOUR-USERNAME.github.io/YOUR-REPOSITORY/ (no install, no login, works offline once loaded)
+**Live demo:** https: https://jamesaisteel.github.io/Astral/ (no install, no login, works offline once loaded)
 
 > Prototype with simulated data. Thresholds are illustrative, not clinical or NASA limits, and nothing here is medical advice.
 
